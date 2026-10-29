@@ -1,0 +1,14 @@
+title = "Does the treatment group score higher?"
+mission = """Two groups of students took the same test; scores.csv has one row per student with columns
+`group` (control | treatment) and `score`. Answer the questions from the data, and register every number you
+report as a measurement so the record can check it. Use the python tool for every computation."""
+files = ["scores.csv"]
+success = "Each question answered with a claim bound to a measurement, the measurement reproduced by the instrument."
+
+[[questions]]
+code = "Q1"
+text = "What is the mean score of each group, and how many students are in each?"
+
+[[questions]]
+code = "Q2"
+text = "Is the difference in means statistically significant at the 5% level (Welch's t-test)? Report t, the degrees of freedom and p."

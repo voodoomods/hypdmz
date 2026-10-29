@@ -1,0 +1,11 @@
+# One analyst does the work; one reviewer checks it. Models come from MODEL in .env (or --model).
+[[seats]]
+name = "analyst"
+role = "worker"
+takes = ["mean", "count", "t-test", "question"]
+about = "Careful with numbers: computes with the python tool, registers each result, never reports a figure it did not compute."
+
+[[seats]]
+name = "reviewer"
+role = "reviewer"
+about = "Checks that every claimed number matches a registered measurement and that the test's assumptions are stated."

@@ -24,9 +24,10 @@ def _lockdown() -> str:
     return out.strip() if rc == 0 and out.strip() else "UNKNOWN"
 
 
-def _http(url: str) -> dict | str:
+def _http(url: str, token: str = "") -> dict | str:
     try:
-        with urllib.request.urlopen(url, timeout=4) as r:
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"} if token else {})
+        with urllib.request.urlopen(req, timeout=4) as r:
             body = r.read(4096)
             try:
                 return json.loads(body)
@@ -41,8 +42,9 @@ def cmd_status(cfg: Config, platform, *, json_output: bool = False) -> int:
         "pod": _pod_state(),
         "containers": {c: _container(c) for c in CONTAINERS},
         "lockdown": _lockdown(),
-        "console": _http(f"http://127.0.0.1:{cfg.console_port}/api/status"),
+        "console": _http(f"http://127.0.0.1:{cfg.console_port}/api/status", cfg.console_token()),
         "record_ui": _http(f"http://127.0.0.1:{cfg.ui_port}/"),
+        "console_token_path": str(cfg.console_token_path),
     }
     if json_output:
         print(json.dumps(snap, indent=2))
@@ -58,6 +60,13 @@ def cmd_status(cfg: Config, platform, *, json_output: bool = False) -> int:
                   f"{pol.get('enabled')}/{pol.get('rules')} rules · vault {con.get('vault', {}).get('credentials')} "
                   f"credential(s) · DLP {con.get('dlp_mode')}"
                   + (f" · POLICY ERROR: {pol['error']}" if pol.get("error") else ""))
+            lim = con.get("limits") or {}
+            used = lim.get("last_hour") or {}
+            print(f"  caps:     {lim.get('calls_per_hour') or '∞'} calls/h · {lim.get('megabytes_per_hour') or '∞'} MB/h"
+                  f" · last hour {used.get('calls', 0)} calls, {used.get('megabytes', 0)} MB"
+                  f" · token {'required' if con.get('console_token') else 'OFF'}")
+            print(f"  curl -H \"Authorization: Bearer $(cat {cfg.console_token_path})\" "
+                  f"http://127.0.0.1:{cfg.console_port}/api/audit")
         else:
             print(f"  console:  {con}")
         print(f"  record UI: {snap['record_ui'] if isinstance(snap['record_ui'], str) else 'up'}"

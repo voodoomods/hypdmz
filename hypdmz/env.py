@@ -177,6 +177,38 @@ class Config:
     def proxy_port(self) -> int:
         return self._port("HYPDMZ_PROXY_PORT", 8080)
 
+    # ── the swarm container's resource limits (podman flags; cgroups v2) ──
+    @property
+    def swarm_memory(self) -> str:
+        return self.env.get("HYPDMZ_SWARM_MEMORY") or "4g"
+
+    @property
+    def swarm_cpus(self) -> str:
+        return self.env.get("HYPDMZ_SWARM_CPUS") or "2"
+
+    @property
+    def swarm_pids(self) -> str:
+        return self.env.get("HYPDMZ_SWARM_PIDS") or "512"
+
+    @property
+    def swarm_tmp(self) -> str:
+        return self.env.get("HYPDMZ_SWARM_TMP") or "2g"
+
+    # ── the control API's bearer token: generated once, host-owned, mounted ro into the proxy ──
+    @property
+    def tokens_dir(self) -> Path:
+        return self.state_dir / "tokens"
+
+    @property
+    def console_token_path(self) -> Path:
+        return self.tokens_dir / "console.token"
+
+    def console_token(self) -> str:
+        try:
+            return self.console_token_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
+
     @property
     def publish_ports(self) -> tuple[tuple[int, int], ...]:
         """(host port, container port) pairs published on 127.0.0.1."""

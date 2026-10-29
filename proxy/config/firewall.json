@@ -1,5 +1,10 @@
 {
   "default_policy": "deny",
+  "limits": {
+    "calls_per_hour": 1200,
+    "megabytes_per_hour": 300,
+    "description": "The pod's cap on the swarm's process, over every rule, sliding hour: forwarded calls and request bytes. 429 past it. HypSwarm's own --budget-usd is the finer control; this one holds when the process is not the HypSwarm you started."
+  },
   "cidr_blocklist": [
     {
       "name": "metadata-services",

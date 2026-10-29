@@ -26,6 +26,7 @@ IMAGES = [
 
 PLACEHOLDER = "__hypdmz_inject__"
 RECORD_IN_POD = "/records/swarm.hypgraph"
+CA_BUNDLE_IN_POD = "/tmp/hypdmz-ca-bundle.crt"
 
 
 # ── build ─────────────────────────────────────────────────────────────
@@ -68,8 +69,10 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
     print("[hypdmz] starting pod...")
     if not dry_run:
         platform.ensure_runtime()
-        for d in (cfg.proxy_data_dir / "audit", cfg.cert_dir, cfg.public_cert_dir, cfg.records_dir, cfg.work_dir):
+        for d in (cfg.proxy_data_dir / "audit", cfg.cert_dir, cfg.public_cert_dir, cfg.records_dir, cfg.work_dir,
+                  cfg.tokens_dir):
             d.mkdir(parents=True, exist_ok=True)
+        ensure_token(cfg.console_token_path)
     print(f"[hypdmz] state:   {cfg.state_dir}")
     print(f"[hypdmz] records: {cfg.records_dir}")
     print(f"[hypdmz] model:   {cfg.model} via {cfg.model_base_url}")
@@ -119,10 +122,12 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
         proxy_env["VAULT_BOOTSTRAP_MODEL_FILE"] = f"/run/secrets/{secret}"
     elif cfg.model_api_key:
         proxy_env["VAULT_BOOTSTRAP_MODEL"] = cfg.model_api_key
+    proxy_env["PROXY_CONSOLE_TOKEN_FILE"] = "/app/tokens/console.token"
     _do(["podman", "run", "-d", "--pod", POD_NAME, "--name", PROXY,
          *_volume(platform, cfg.repo_root / "proxy" / "config", "/app/config", readonly=True),
          *_volume(platform, cfg.proxy_data_dir, "/app/data"),
          *_volume(platform, cfg.cert_dir, "/etc/hypdmz-certs", readonly=True),
+         *_volume(platform, cfg.tokens_dir, "/app/tokens", readonly=True),
          *secret_args,
          *_envs(proxy_env), "hypdmz-proxy:latest"], dry_run, redact=("VAULT_BOOTSTRAP_MODEL",))
 
@@ -133,13 +138,25 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
         "HTTP_PROXY": "http://127.0.0.1:8080",
         "HTTPS_PROXY": "http://127.0.0.1:8080",
         "NO_PROXY": "localhost,127.0.0.1",
-        "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
-        "REQUESTS_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
+        # the entrypoint writes this bundle (system CAs + the HypDMZ CA) into /tmp: the root filesystem is read-only
+        "SSL_CERT_FILE": CA_BUNDLE_IN_POD,
+        "REQUESTS_CA_BUNDLE": CA_BUNDLE_IN_POD,
+        "CURL_CA_BUNDLE": CA_BUNDLE_IN_POD,
+        "HYPDMZ_CA_BUNDLE": CA_BUNDLE_IN_POD,
         "HYPDMZ_RECORD": RECORD_IN_POD,
     }
     _do(["podman", "run", "-d", "--pod", POD_NAME, "--name", SWARM,
-         "--cap-drop", "ALL", "--cap-add", "SETUID", "--cap-add", "SETGID",
+         # SETUID/SETGID: gosu drops to the swarm user. CHOWN: the entrypoint hands /home/swarm (a tmpfs) and the
+         # mounts to that user, and `hypdmz run` chowns each work folder (matters on Linux; Windows mounts ignore it).
+         "--cap-drop", "ALL", "--cap-add", "SETUID", "--cap-add", "SETGID", "--cap-add", "CHOWN",
          "--security-opt", "no-new-privileges",
+         # the blast radius of whatever the swarm runs: a read-only image, capped scratch space, capped memory,
+         # CPU and process count. /records and /work are the only places anything persists.
+         "--read-only",
+         "--tmpfs", f"/tmp:rw,size={cfg.swarm_tmp},mode=1777",
+         "--tmpfs", "/home/swarm:rw,size=256m,mode=0700",      # the entrypoint chowns it to the swarm user
+         "--memory", cfg.swarm_memory, "--memory-swap", cfg.swarm_memory,
+         "--cpus", cfg.swarm_cpus, "--pids-limit", cfg.swarm_pids,
          *_volume(platform, cfg.records_dir, "/records"),
          *_volume(platform, cfg.work_dir, "/work"),
          *_volume(platform, cfg.public_cert_dir, "/etc/hypdmz-certs", readonly=True),
@@ -149,7 +166,7 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
         return 0
     platform.add_port_forwards([p for p, _ in cfg.publish_ports])
     print(f"\n[hypdmz] pod is up.\n  record UI  → http://127.0.0.1:{cfg.ui_port}\n"
-          f"  console    → http://127.0.0.1:{cfg.console_port}\n"
+          f"  console    → http://127.0.0.1:{cfg.console_port}  (bearer token: {cfg.console_token_path})\n"
           f"  proxy      → http://127.0.0.1:{cfg.proxy_port}  (host tools: trust {cfg.ca_cert_path})")
     if cfg.model_api_key and not secret:
         print(f"[hypdmz] MODEL_API_KEY was handed to the vault — remove it from {cfg.env_file} now.")
@@ -266,6 +283,24 @@ def cmd_debug(cfg: Config, platform: Platform) -> int:
 def secret_exists(name: str) -> bool:
     rc, _, _ = run_capture(["podman", "secret", "exists", name])
     return rc == 0
+
+
+def ensure_token(path: Path) -> str:
+    """A bearer token for the control API, generated once (0600, host-owned). The proxy reads it through a
+    read-only mount; `hypdmz status` and `egress-check` read it here."""
+    import secrets as _secrets
+    if path.exists():
+        tok = path.read_text(encoding="utf-8").strip()
+        if tok:
+            return tok
+    tok = _secrets.token_urlsafe(32)
+    path.write_text(tok + "\n", encoding="utf-8", newline="\n")
+    try:
+        path.chmod(0o600)
+    except Exception:
+        pass
+    print(f"[hypdmz] console token created at {path}")
+    return tok
 
 
 def _do(args: list[str], dry_run: bool, *, redact: tuple[str, ...] = ()) -> None:

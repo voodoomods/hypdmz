@@ -67,6 +67,19 @@ def probes(cfg: Config) -> tuple[Probe, ...]:
               "d=\"$(python -c 'import hypswarm,os;print(os.path.dirname(hypswarm.__file__))')\"; "
               "[ -w \"$d/run.py\" ] || [ -w \"$d\" ] || [ -w /entrypoint.sh ] && echo ok || echo fail",
               "Write its own code (hypswarm, the entrypoint)"),
+        # ── the blast radius: what the swarm's process is allowed to consume and change ──
+        Probe("swarm-rootfs-readonly", "control",
+              "awk '$2 == \"/\" && $4 ~ /(^|,)ro(,|$)/ { f = 1 } END { exit !f }' /proc/mounts && echo ok || echo fail",
+              "The container's root filesystem is mounted read-only"),
+        Probe("swarm-memory-capped", "control",
+              "v=$(cat /sys/fs/cgroup/memory.max 2>/dev/null); [ -n \"$v\" ] && [ \"$v\" != max ] && echo ok || echo fail",
+              "A memory limit is set on the container's cgroup"),
+        Probe("swarm-pids-capped", "control",
+              "v=$(cat /sys/fs/cgroup/pids.max 2>/dev/null); [ -n \"$v\" ] && [ \"$v\" != max ] && echo ok || echo fail",
+              "A process-count limit is set on the container's cgroup"),
+        Probe("swarm-cpu-capped", "control",
+              "v=$(cut -d' ' -f1 /sys/fs/cgroup/cpu.max 2>/dev/null); [ -n \"$v\" ] && [ \"$v\" != max ] && echo ok || echo fail",
+              "A CPU quota is set on the container's cgroup"),
         Probe("lockdown-gate", "control",
               "curl -s --max-time 2 telnet://127.0.0.1:8009 </dev/null 2>/dev/null | grep -q '^LOCKED' && echo ok || echo fail",
               "The controller reports LOCKED on the gate"),
@@ -93,6 +106,7 @@ class EgressReport:
     lockdown_state: str
     results: list[ProbeResult]
     error: Optional[str] = None
+    caps: Optional[dict] = None     # the proxy's hourly caps and the last hour's use
 
     @property
     def ok(self) -> bool:
@@ -157,20 +171,71 @@ def run_check(cfg: Config, *, wait_for_lock_s: int = 20) -> EgressReport:
         observed[name.strip()] = value.strip() or "000"
     results = [ProbeResult(p.name, p.kind, _passed(p, observed.get(p.name, "missing")),
                            observed.get(p.name, "missing"), p.description) for p in ps]
-    return EgressReport(state, results)
+    results += console_checks(cfg)
+    return EgressReport(state, results, caps=console_caps(cfg))
+
+
+def _console_get(cfg: Config, path: str, token: str | None) -> int:
+    """HTTP status of GET <console>/path from the host, with or without the bearer token (0 = unreachable)."""
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(f"http://127.0.0.1:{cfg.console_port}{path}")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except Exception:
+        return 0
+
+
+def console_checks(cfg: Config) -> list[ProbeResult]:
+    """Run from the host: the control API must refuse a request without the token and answer one with it."""
+    tok = cfg.console_token()
+    without = _console_get(cfg, "/api/status", None)
+    with_tok = _console_get(cfg, "/api/status", tok) if tok else 0
+    return [
+        ProbeResult("console-requires-token", "blocked", without == 401, str(without),
+                    "Control API without the bearer token (from the host)"),
+        ProbeResult("console-with-token", "control", with_tok == 200, str(with_tok),
+                    f"Control API with the token from {cfg.console_token_path.name}"),
+    ]
+
+
+def console_caps(cfg: Config) -> dict:
+    """The proxy's hourly caps and the last hour's use, for the report header."""
+    import urllib.request
+    tok = cfg.console_token()
+    if not tok:
+        return {}
+    req = urllib.request.Request(f"http://127.0.0.1:{cfg.console_port}/api/status",
+                                 headers={"Authorization": f"Bearer {tok}"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return json.load(r).get("limits") or {}
+    except Exception:
+        return {}
 
 
 def report_dict(report: EgressReport) -> dict:
     return {"ok": report.ok, "bypass_found": report.bypass_found, "lockdown_state": report.lockdown_state,
-            "error": report.error, "results": [asdict(r) for r in report.results]}
+            "caps": report.caps or {}, "error": report.error, "results": [asdict(r) for r in report.results]}
 
 
 def print_report(report: EgressReport) -> None:
-    print(f"── lockdown ──\n  {report.lockdown_state}\n")
+    print(f"── lockdown ──\n  {report.lockdown_state}")
+    if report.caps:
+        used = report.caps.get("last_hour") or {}
+        print(f"  caps: {report.caps.get('calls_per_hour') or '∞'} calls/h · "
+              f"{report.caps.get('megabytes_per_hour') or '∞'} MB/h · last hour: {used.get('calls', 0)} calls, "
+              f"{used.get('megabytes', 0)} MB")
+    print()
     if report.error:
         print(f"[ERROR] could not run probes: {report.error}")
         return
-    print("── probes (run as the swarm user) ──")
+    print("── probes (run as the swarm user; the two console probes from the host) ──")
     for r in report.results:
         glyph = "PASS" if r.passed else "FAIL"
         expect = "blocked" if r.kind == "blocked" else "reachable"

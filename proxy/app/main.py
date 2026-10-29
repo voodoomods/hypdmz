@@ -19,6 +19,7 @@ Everything the swarm sends out passes through here. Nothing else can.
 from __future__ import annotations
 
 import asyncio
+import hmac
 import os
 import ssl
 import time
@@ -29,10 +30,11 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from . import audit, dlp, firewall_policy, injection, tls_mitm, vault
+from . import audit, dlp, firewall_policy, injection, limits, tls_mitm, vault
 from .firewall import evaluate
 
 PROXY_PORT = int(os.getenv("PROXY_PORT", "8080"))
+CONSOLE_TOKEN = (os.getenv("PROXY_CONSOLE_TOKEN") or "").strip()   # set by the entrypoint from the token file
 PLACEHOLDER = "__hypdmz_inject__"       # the swarm's OPENAI_API_KEY; the vault supplies the real one
 PREVIEW_CAP = 64 * 1024                 # response bytes kept for inbound DLP
 
@@ -54,6 +56,13 @@ async def _loopback_only(request: Request, call_next):
         if site in ("cross-site", "same-site") or (origin and urlparse(origin).hostname not in
                                                    ("127.0.0.1", "localhost", "::1")):
             return PlainTextResponse("cross-origin state change refused", status_code=403)
+    # Bearer token (the launcher generates it into <state dir>/tokens/console.token): loopback is not a user.
+    if CONSOLE_TOKEN and request.url.path != "/healthz":
+        auth = request.headers.get("authorization") or ""
+        given = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+        if not given or not hmac.compare_digest(given, CONSOLE_TOKEN):
+            return PlainTextResponse("console token required (Authorization: Bearer …)", status_code=401,
+                                     headers={"WWW-Authenticate": "Bearer"})
     return await call_next(request)
 
 
@@ -69,7 +78,9 @@ def api_status():
         "tls_interception": tls_mitm.is_available(),
         "ca_fingerprint_sha256": tls_mitm.ca_fingerprint() if tls_mitm.is_available() else "",
         "dlp_mode": dlp.DLP_MODE,
+        "console_token": bool(CONSOLE_TOKEN),
         "policy": firewall_policy.status(),
+        "limits": limits.status(firewall_policy.get_policy().get("limits", {})),
         "vault": {"credentials": len(vault.list_credentials())},
         "audit": {"path": audit.AUDIT_PATH, "in_memory": len(audit.recent_events(audit.RING)),
                   "remote_sink": bool(audit.SINK_URL)},
@@ -261,6 +272,19 @@ async def _proxy_one_exchange(reader: asyncio.StreamReader, writer: asyncio.Stre
         await writer.drain()
         audit.log_request(client_host=client_ip, method=method, url=target_str, host=host, port=port,
                           decision="deny", matched_rule=verdict.matched_rule, scheme=scheme, path=path,
+                          req_body=body_bytes, latency_ms=int((time.monotonic() - t_start) * 1000))
+        return False
+
+    # ── the hourly caps: calls and request bytes, over every rule ──
+    crossed = limits.check_and_count(firewall_policy.get_policy().get("limits", {}), len(body_bytes))
+    if crossed:
+        body = f"HypDMZ cap reached: {crossed}".encode()
+        writer.write(b"HTTP/1.1 429 Too Many Requests\r\nX-Proxy-Decision: deny\r\nX-Proxy-Rule: limit:" + crossed.encode()
+                     + b"\r\nRetry-After: 600\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(body)).encode()
+                     + b"\r\nConnection: close\r\n\r\n" + body)
+        await writer.drain()
+        audit.log_request(client_host=client_ip, method=method, url=target_str, host=host, port=port,
+                          decision="deny", matched_rule="limit:" + crossed, scheme=scheme, path=path, status_code=429,
                           req_body=body_bytes, latency_ms=int((time.monotonic() - t_start) * 1000))
         return False
 

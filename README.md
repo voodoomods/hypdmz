@@ -54,6 +54,8 @@ state dir); `--record NAME` writes a separate file instead.
 | Read the TLS interception CA's private key | no — the swarm mounts the certificate alone |
 | Rewrite its own code | no — root-owned, `go-w`, checked with `access(2)` as the swarm user at start |
 | Send a secret out in a request | no — DLP over bodies and auth headers blocks it (`DLP_MODE=block`) |
+| Call the model without limit | no — the proxy caps forwarded calls and request megabytes per sliding hour (`limits` in `firewall.json`; 429 past the cap, audited) |
+| Exhaust the machine | no — read-only root filesystem, size-capped `/tmp` and home, memory, CPU and process-count limits on the container; only `/records` and `/work` persist |
 | Do anything unlogged | no — every request, allowed or denied, is a line in a SHA-256 hash chain (`proxy-data/audit/`); optional remote sink |
 
 The allowlist is a JSON file under version control, hot-reloaded (size + mtime, checked once a second). A
@@ -75,11 +77,13 @@ docs/DESIGN.md     what was taken from PegasusDMZ, what was left out, and why
 State (secrets, records) lives outside the repo: `%USERPROFILE%\.hypdmz` on Windows,
 `~/.local/state/hypdmz` on Linux, `~/Library/Application Support/HypDMZ` on macOS (`HYPDMZ_STATE_DIR` overrides).
 
-## Control API (`:8002`, loopback only)
+## Control API (`:8002`, loopback only, bearer token)
 
 `GET /healthz` · `GET /api/status` · `GET /api/policy` · `GET /api/audit?n=` · `GET /api/audit/verify` ·
 `GET /api/vault` · `POST /api/vault` `{name, value, type, injection_spec?, scope_host?}` · `DELETE /api/vault/{name}`.
-A `Host` header that is not loopback, or a cross-origin state change, is refused.
+Everything but `/healthz` needs `Authorization: Bearer <token>`; the token is generated once into
+`<state dir>/tokens/console.token` (0600) and mounted read-only into the proxy. `hypdmz status` prints the
+`curl` line. A `Host` header that is not loopback, or a cross-origin state change, is refused as well.
 
 ## Using the pod's proxy from the host
 

@@ -22,7 +22,7 @@ from pathlib import Path
 CONFIG_PATH = os.getenv("FIREWALL_CONFIG", "/app/config/firewall.json")
 CHECK_EVERY_S = 1.0
 
-_EMPTY = {"rules": [], "cidr_blocklist": [], "default_policy": "deny"}
+_EMPTY = {"rules": [], "cidr_blocklist": [], "limits": {}, "default_policy": "deny"}
 
 _lock = threading.Lock()
 _policy: dict | None = None
@@ -43,9 +43,11 @@ def _read() -> tuple[dict, str]:
     if not isinstance(data, dict) or not isinstance(data.get("rules", []), list):
         return dict(_EMPTY), f"{CONFIG_PATH} has no 'rules' list — denying everything"
     rules = [r for r in data.get("rules", []) if isinstance(r, dict) and r.get("name")]
+    limits = data.get("limits") if isinstance(data.get("limits"), dict) else {}
     return {
         "rules": rules,
         "cidr_blocklist": [c for c in data.get("cidr_blocklist", []) if isinstance(c, dict)],
+        "limits": limits,                    # calls_per_hour / megabytes_per_hour, see limits.py
         "default_policy": "deny",            # the only policy HypDMZ has
     }, ""
 
@@ -81,6 +83,7 @@ def status() -> dict:
         "rules": len(pol["rules"]),
         "enabled": sum(1 for r in pol["rules"] if r.get("enabled", True)),
         "cidr_blocks": len(pol["cidr_blocklist"]),
+        "limits": pol.get("limits", {}),
         "loaded_at": _loaded_at,
         "error": _error,
     }

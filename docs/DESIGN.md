@@ -55,6 +55,24 @@ hypdmz run ──podman exec──▶ hypdmz-swarm (UID 1000, loopback only)
 The swarm container holds: hypswarm, hypgraph, the records mount, the work mount, the CA *certificate*. It
 does not hold: the API key, the CA key, the vault, the audit log, the policy.
 
+## The blast radius (added after the first live run)
+
+Three things a hostile or runaway swarm process could still have done, each now a refusal with a probe:
+
+- **Exhaust the machine.** The swarm container runs with `--read-only` (the CA bundle goes to a tmpfs `/tmp`),
+  size-capped tmpfs for `/tmp` and `/home/swarm`, `--memory` (+ swap = same), `--cpus` and `--pids-limit`
+  (`HYPDMZ_SWARM_*`). Probes `swarm-rootfs-readonly`, `swarm-memory-capped`, `swarm-pids-capped`,
+  `swarm-cpu-capped` read the cgroup and `/proc/mounts` from inside. `/records` and `/work` are host bind
+  mounts and cannot be size-capped by podman; that stays a limit.
+- **Call the model without limit.** `proxy/app/limits.py`: sliding-hour caps on forwarded calls and request
+  megabytes, over every rule, from `firewall.json → limits` (hot-reloaded). Past a cap: 429, audited as
+  `limit:<cap>`. In memory, so a proxy restart resets the window. HypSwarm's own budget is the finer control;
+  this one holds when the process is not the HypSwarm you started.
+- **Read or change the proxy's state from the host.** The control API requires a bearer token (`hmac.compare_digest`)
+  on everything but `/healthz`. The launcher generates it once into `<state dir>/tokens/console.token` (0600),
+  mounts the dir read-only, and the proxy entrypoint reads it as root before dropping privileges. Probes
+  `console-requires-token` (401 without) and `console-with-token` (200 with) run from the host.
+
 ## Known limits (honest)
 
 - The API key's first mile is a podman secret (`hypdmz_llm_api_key`, `HYPDMZ_KEY_SECRET`), mounted into the

@@ -45,17 +45,27 @@ if [ -n "$writable" ]; then
     exit 1
 fi
 
-# 3. Trust the HypDMZ egress CA (the public certificate only — the key is the proxy's).
+# 3. Trust the HypDMZ egress CA (the public certificate only — the key is the proxy's). The root filesystem is
+#    read-only, so the bundle goes to /tmp (a size-capped tmpfs); the launcher points SSL_CERT_FILE,
+#    REQUESTS_CA_BUNDLE and CURL_CA_BUNDLE at the same path for `hypdmz run`'s exec'd processes.
 CA_CERT=/etc/hypdmz-certs/hypdmz-ca-cert.pem
+BUNDLE="${HYPDMZ_CA_BUNDLE:-/tmp/hypdmz-ca-bundle.crt}"
 if [ -f "$CA_CERT" ]; then
-    cp "$CA_CERT" /usr/local/share/ca-certificates/hypdmz-ca.crt
-    update-ca-certificates 2>&1 | tail -1
+    cat /etc/ssl/certs/ca-certificates.crt "$CA_CERT" > "$BUNDLE" && chmod 644 "$BUNDLE"
+    export SSL_CERT_FILE="$BUNDLE" REQUESTS_CA_BUNDLE="$BUNDLE" CURL_CA_BUNDLE="$BUNDLE"
+    echo "[swarm] trusting the HypDMZ egress CA via $BUNDLE"
 else
     echo "[swarm] WARNING: no CA certificate at $CA_CERT — HTTPS through the proxy will fail"
 fi
+if awk '$2 == "/" && $4 ~ /(^|,)ro(,|$)/ { found = 1 } END { exit !found }' /proc/mounts; then
+    echo "[swarm] root filesystem is read-only; writable: /records /work /tmp /home/swarm"
+else
+    echo "[swarm] WARNING: root filesystem is writable (started without --read-only?)"
+fi
 
-# 4. The swarm's own directories (best effort; Windows/macOS mounts ignore chown).
-chown swarm:swarm /records /work 2>/dev/null || true
+# 4. The swarm's own directories (best effort; Windows/macOS mounts ignore chown). /home/swarm is a tmpfs the
+#    launcher mounts 0700; it arrives root-owned.
+chown swarm:swarm /records /work /home/swarm 2>/dev/null || true
 chown -R swarm:swarm /work 2>/dev/null || true
 
 RECORD="${HYPDMZ_RECORD:-/records/swarm.hypgraph}"

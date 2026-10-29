@@ -138,3 +138,11 @@ def test_egress_probes_cover_the_claims():
 def test_module_entry_point():
     p = subprocess.run([sys.executable, "-m", "hypdmz", "--version"], capture_output=True, text=True, cwd=ROOT)
     assert p.returncode == 0 and __version__ in p.stdout
+
+
+def test_swarm_image_pins_a_hypgraph_whose_serve_answers_browsers():
+    """hypgraph < 0.7.7 answered 421 to every request when bound to 0.0.0.0, as the swarm image binds it."""
+    df = (env.IMAGES_DIR / "swarm" / "Dockerfile").read_text(encoding="utf-8")
+    pin = re.search(r"^ARG HYPGRAPH_VERSION=(\S+)$", df, re.M).group(1)
+    assert tuple(int(x) for x in pin.split(".")[:3]) >= (0, 7, 7), pin
+    assert "--host 0.0.0.0" in (env.IMAGES_DIR / "swarm" / "entrypoint.sh").read_text(encoding="utf-8")

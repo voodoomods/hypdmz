@@ -18,10 +18,10 @@ CONTAINERS = (CONTROLLER, PROXY, SWARM)
 SWARM_USER = "swarm"
 PROXY_UID = 1001
 
-IMAGES = [
-    ("hypdmz-controller:latest", "controller/"),
-    ("hypdmz-proxy:latest", "proxy/"),
-    ("hypdmz-swarm:latest", "swarm/"),
+IMAGES = [                                     # tag, build context under the package's images/
+    ("hypdmz-controller:latest", "controller"),
+    ("hypdmz-proxy:latest", "proxy"),
+    ("hypdmz-swarm:latest", "swarm"),
 ]
 
 PLACEHOLDER = "__hypdmz_inject__"
@@ -35,7 +35,7 @@ def cmd_build(cfg: Config, platform: Platform, *, dry_run: bool = False) -> int:
     print("[hypdmz] building pod images...")
     for i, (tag, ctx) in enumerate(IMAGES, 1):
         print(f"\n[{i}/{len(IMAGES)}] building {tag}")
-        args = ["podman", "build", "-t", tag, platform.host_path(cfg.repo_root / ctx)]
+        args = ["podman", "build", "-t", tag, platform.host_path(cfg.images_dir / ctx)]
         if dry_run:
             print(f"  $ {' '.join(args)}")
             continue
@@ -70,9 +70,11 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
     if not dry_run:
         platform.ensure_runtime()
         for d in (cfg.proxy_data_dir / "audit", cfg.cert_dir, cfg.public_cert_dir, cfg.records_dir, cfg.work_dir,
-                  cfg.tokens_dir):
+                  cfg.tokens_dir, cfg.policy_dir):
             d.mkdir(parents=True, exist_ok=True)
         ensure_token(cfg.console_token_path)
+        ensure_policy(cfg)
+    print(f"[hypdmz] policy:  {cfg.policy_path}")
     print(f"[hypdmz] state:   {cfg.state_dir}")
     print(f"[hypdmz] records: {cfg.records_dir}")
     print(f"[hypdmz] model:   {cfg.model} via {cfg.model_base_url}")
@@ -124,7 +126,7 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
         proxy_env["VAULT_BOOTSTRAP_MODEL"] = cfg.model_api_key
     proxy_env["PROXY_CONSOLE_TOKEN_FILE"] = "/app/tokens/console.token"
     _do(["podman", "run", "-d", "--pod", POD_NAME, "--name", PROXY,
-         *_volume(platform, cfg.repo_root / "proxy" / "config", "/app/config", readonly=True),
+         *_volume(platform, cfg.policy_dir, "/app/config", readonly=True),
          *_volume(platform, cfg.proxy_data_dir, "/app/data"),
          *_volume(platform, cfg.cert_dir, "/etc/hypdmz-certs", readonly=True),
          *_volume(platform, cfg.tokens_dir, "/app/tokens", readonly=True),
@@ -197,9 +199,12 @@ def cmd_run(cfg: Config, platform: Platform, folder: Path, *, task: str = "task.
             profile: str = "", model: str = "", budget_usd: float = 0.0, budget_calls: int = 150,
             pricing: str = "", python: bool = False, record: str = "", name: str = "") -> int:
     """Copy `folder` into the pod's work area and run hypswarm there, as the swarm user."""
+    if not folder.exists() and (cfg.examples_dir / str(folder)).is_dir():
+        folder = cfg.examples_dir / str(folder)              # a bundled example by name: `hypdmz run first-swarm`
     folder = folder.resolve()
     if not (folder / task).is_file():
-        print(f"[hypdmz] no {task} in {folder}")
+        names = bundled_examples(cfg)
+        print(f"[hypdmz] no {task} in {folder}" + (f" (bundled examples: {', '.join(names)})" if names else ""))
         return 2
     rc, _, _ = run_capture(["podman", "container", "exists", SWARM])
     if rc != 0:
@@ -283,6 +288,22 @@ def cmd_debug(cfg: Config, platform: Platform) -> int:
 def secret_exists(name: str) -> bool:
     rc, _, _ = run_capture(["podman", "secret", "exists", name])
     return rc == 0
+
+
+def ensure_policy(cfg: Config) -> bool:
+    """Seed the operator's policy from the package's default once. Returns True if it was just created."""
+    if cfg.policy_path.exists():
+        return False
+    cfg.policy_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(cfg.default_policy, cfg.policy_path)
+    print(f"[hypdmz] policy seeded from the package default → {cfg.policy_path}")
+    return True
+
+
+def bundled_examples(cfg: Config) -> list[str]:
+    if not cfg.examples_dir.is_dir():
+        return []
+    return sorted(p.name for p in cfg.examples_dir.iterdir() if (p / "task.toml").is_file())
 
 
 def ensure_token(path: Path) -> str:

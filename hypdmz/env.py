@@ -93,9 +93,15 @@ DEFAULT_MODEL_BASE_URL = "https://api.deepinfra.com/v1/openai"
 DEFAULT_MODEL = "deepseek-ai/DeepSeek-V4.1-Flash"
 
 
+PACKAGE_DIR = Path(__file__).resolve().parent
+IMAGES_DIR = PACKAGE_DIR / "images"            # the three build contexts ride inside the package
+EXAMPLES_DIR = PACKAGE_DIR / "examples"
+DEFAULT_POLICY = IMAGES_DIR / "proxy" / "config" / "firewall.json"
+ENV_EXAMPLE = PACKAGE_DIR / "env.example"
+
+
 @dataclass
 class Config:
-    repo_root: Path
     env: dict[str, str] = field(default_factory=dict)
     state_dir: Path = None  # type: ignore[assignment]
     state_source: str = "default"
@@ -104,10 +110,26 @@ class Config:
         if self.state_dir is None:
             self.state_dir, self.state_source = resolve_state_dir()
 
+    # ── what the package carries ──
+    images_dir: Path = IMAGES_DIR
+    examples_dir: Path = EXAMPLES_DIR
+    default_policy: Path = DEFAULT_POLICY
+    env_example: Path = ENV_EXAMPLE
+
     # ── paths ──
     @property
     def env_file(self) -> Path:
         return self.state_dir / ".env"
+
+    @property
+    def policy_dir(self) -> Path:
+        """The operator's policy, mounted read-only into the proxy. Seeded from the package's default on the
+        first `up`; after that it is yours (hot-reloaded; `hypdmz policy reset` restores the default)."""
+        return self.state_dir / "policy"
+
+    @property
+    def policy_path(self) -> Path:
+        return self.policy_dir / "firewall.json"
 
     @property
     def proxy_data_dir(self) -> Path:
@@ -221,7 +243,7 @@ class Config:
 _PASSTHROUGH = {"MODEL_API_KEY", "MODEL_BASE_URL", "MODEL", "DLP_MODE", "AUDIT_SINK_URL", "AUDIT_SINK_TOKEN"}
 
 
-def load(repo_root: Path, env_file: Path | None = None) -> Config:
+def load(env_file: Path | None = None) -> Config:
     """Load <state dir>/.env, then let the process environment override it."""
     state_dir, source = resolve_state_dir()
     env: dict[str, str] = {}
@@ -229,4 +251,4 @@ def load(repo_root: Path, env_file: Path | None = None) -> Config:
     for k, v in os.environ.items():
         if k in env or k.startswith("HYPDMZ_") or k in _PASSTHROUGH:
             env[k] = v
-    return Config(repo_root=repo_root, env=env, state_dir=state_dir, state_source=source)
+    return Config(env=env, state_dir=state_dir, state_source=source)

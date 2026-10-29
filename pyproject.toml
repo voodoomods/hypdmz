@@ -4,14 +4,43 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hypdmz"
-version = "0.1.0"
-description = "Run a HypSwarm research swarm inside a governed-egress pod: UID-scoped egress floor, allowlisting TLS-intercepting proxy, vaulted credentials, hash-chained audit."
+version = "0.1.0a1"
+description = "Run a HypSwarm research swarm inside a governed-egress pod: a UID-scoped egress floor, an allowlisting TLS-intercepting proxy, vaulted credentials, hourly caps, a hash-chained audit — and an egress check from the swarm's own seat on every start."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
+keywords = ["agents", "sandbox", "egress", "podman", "hypswarm", "hypgraph", "security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Security",
+    "Topic :: System :: Systems Administration",
+]
+
+[project.urls]
+Homepage = "https://hypdmz.com"
+HypSwarm = "https://hypswarm.com"
+HypGraph = "https://hypgraph.com"
 
 [project.scripts]
 hypdmz = "hypdmz.cli:main"
 
+[project.optional-dependencies]
+dev = ["pytest>=8", "build>=1.2"]
+
 [tool.setuptools.packages.find]
 include = ["hypdmz*"]
+
+[tool.setuptools.package-data]
+# the three image build contexts, the default policy, the .env template and the bundled examples ride in the wheel
+hypdmz = ["env.example", "images/**/*", "examples/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

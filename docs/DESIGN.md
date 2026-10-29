@@ -37,6 +37,15 @@ only thing it can reach, and prove it.
   lives in the swarm container's `/records` mount, served by the same library.
 - **Bridge, office, gym, meetings, company layer** — Pegasus's organisation; not protection.
 
+## Layout: the launcher carries the pod
+
+`pip install hypdmz` is the whole thing. The package `hypdmz/` holds the launcher and, as package data, the three
+image build contexts (`hypdmz/images/{controller,proxy,swarm}`), the default policy
+(`hypdmz/images/proxy/config/firewall.json`), the `.env` template and the bundled examples. `hypdmz build` builds
+the images from those contexts; `hypdmz up` seeds the operator's policy into `<state dir>/policy/firewall.json` on
+the first run and mounts that directory read-only into the proxy — after that the policy is the operator's
+(`hypdmz policy show|path|reset`). Nothing is read from a repository checkout.
+
 ## Trust boundaries
 
 ```

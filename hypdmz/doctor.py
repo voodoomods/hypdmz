@@ -9,7 +9,7 @@ from hypdmz.platforms.base import Platform, PreflightResult
 
 
 def cmd_doctor(cfg: Config, platform: Platform, *, json_output: bool = False) -> int:
-    app_results = [_check_env_file(cfg), _check_state_dir(cfg), _check_model_key(cfg), _check_build_inputs(cfg)]
+    app_results = [_check_env_file(cfg), _check_state_dir(cfg), _check_model_key(cfg), _check_package(cfg), _check_policy(cfg)]
     plat_results = platform.preflight()
     fail = sum(1 for r in app_results + plat_results if not r.ok)
     if json_output:
@@ -31,8 +31,7 @@ def cmd_doctor(cfg: Config, platform: Platform, *, json_output: bool = False) ->
 def _check_env_file(cfg: Config) -> PreflightResult:
     if cfg.env_file.exists():
         return PreflightResult(".env present", True, str(cfg.env_file))
-    return PreflightResult(".env present", False,
-                           f"copy .env.example to {cfg.env_file} (MODEL_API_KEY, MODEL_BASE_URL, MODEL)")
+    return PreflightResult(".env present", False, f"run `hypdmz init` (writes {cfg.env_file} from the package template)")
 
 
 def _check_state_dir(cfg: Config) -> PreflightResult:
@@ -58,9 +57,20 @@ def _check_model_key(cfg: Config) -> PreflightResult:
                            f"no key: `podman secret create {cfg.key_secret} -` (paste it), or MODEL_API_KEY in .env")
 
 
-def _check_build_inputs(cfg: Config) -> PreflightResult:
+def _check_package(cfg: Config) -> PreflightResult:
     missing = [p for p in ("controller/Dockerfile", "proxy/Dockerfile", "swarm/Dockerfile", "proxy/config/firewall.json")
-               if not (cfg.repo_root / p).exists()]
+               if not (cfg.images_dir / p).exists()]
     if missing:
-        return PreflightResult("repo layout", False, f"missing under {cfg.repo_root}: {', '.join(missing)}")
-    return PreflightResult("repo layout", True, str(cfg.repo_root))
+        return PreflightResult("bundled images", False, f"missing under {cfg.images_dir}: {', '.join(missing)} (broken install?)")
+    return PreflightResult("bundled images", True, f"{cfg.images_dir} (controller, proxy, swarm)")
+
+
+def _check_policy(cfg: Config) -> PreflightResult:
+    src = cfg.policy_path if cfg.policy_path.exists() else cfg.default_policy
+    try:
+        pol = json.loads(src.read_text(encoding="utf-8"))
+        n = len(pol.get("rules") or [])
+    except Exception as e:
+        return PreflightResult("egress policy", False, f"{src} does not parse ({e}); the proxy denies everything until it does")
+    where = "operator policy" if src == cfg.policy_path else "package default (seeded on the first `up`)"
+    return PreflightResult("egress policy", True, f"{src}: {n} rule(s), {where}")

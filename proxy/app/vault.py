@@ -434,7 +434,7 @@ def _bootstrap_from_env() -> None:
             create_credential(
                 {"name": name, "value": val, "type": type_,
                  "injection_spec": spec, **scope},
-                actor="bootstrap:env",
+                actor="bootstrap:secret" if source.startswith("secret") else "bootstrap:env",
             )
             print(f"[vault] bootstrapped credential '{name}' from {source}")
             _link_to_rules(name, rule_links)

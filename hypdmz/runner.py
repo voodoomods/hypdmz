@@ -101,6 +101,7 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
 
     proxy_env = {
         "HYPDMZ_PROXY_UID": str(PROXY_UID),
+        "PYTHONUNBUFFERED": "1",
         "FIREWALL_CONFIG": "/app/config/firewall.json",
         "PROXY_AUDIT_PATH": "/app/data/audit/proxy_events.jsonl",
         "PROXY_AUDIT_HEAD_PATH": "/app/data/audit/.chain_head",

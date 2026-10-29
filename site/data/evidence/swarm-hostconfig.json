@@ -1,0 +1,25 @@
+{
+ "ReadonlyRootfs": true,
+ "Memory": 4294967296,
+ "MemorySwap": 4294967296,
+ "PidsLimit": 512,
+ "NanoCpus": 2000000000,
+ "CapDrop": [
+  "CAP_DAC_OVERRIDE",
+  "CAP_FOWNER",
+  "CAP_FSETID",
+  "CAP_KILL",
+  "CAP_NET_BIND_SERVICE",
+  "CAP_SETFCAP",
+  "CAP_SETPCAP",
+  "CAP_SYS_CHROOT"
+ ],
+ "CapAdd": [],
+ "SecurityOpt": [
+  "no-new-privileges"
+ ],
+ "Tmpfs": {
+  "/home/swarm": "rw,size=256m,mode=0700,rprivate,nosuid,nodev,tmpcopyup",
+  "/tmp": "rw,size=2g,mode=1777,rprivate,nosuid,nodev,tmpcopyup"
+ }
+}

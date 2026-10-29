@@ -1,9 +1,10 @@
-# hypdmz.com: publish site/ to GitHub Pages on every push to main.
+# hypdmz.com: build the page's record from the committed evidence, check the page's text against it, copy the HypGraph
+# UI, and publish site/ to GitHub Pages on every push to main that touches the site.
 name: pages
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "dev/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -23,6 +24,14 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "hypgraph==0.7.6"
+      # the page's own record from site/data/evidence/, and the page's text checked against it (a copy error fails the deploy)
+      - run: python dev/site_record.py
+      # the HypGraph UI from the released hypgraph, and no root-absolute paths (the site also works under /hypdmz/)
+      - run: python dev/build_site.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

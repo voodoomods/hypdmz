@@ -16,16 +16,19 @@
 <link rel="alternate" type="text/plain" href="llms.txt" title="For language models">
 <link rel="stylesheet" href="assets/site.css">
 <link rel="stylesheet" href="assets/dmz.css">
+<link rel="stylesheet" href="app/hypgraph.css">
 <script>try{const t=localStorage.getItem('hg-theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark'}catch(e){}</script>
 </head>
 <body>
-<!-- Every figure on this page comes from a named run on a named date (see "Measured" under each). Nothing here is a
-     target or an estimate; where a guarantee has a limit, the limit is on the page too (#limits). -->
+<!-- Every figure on this page is a claim in its own HypGraph record (data/site-record.bundle.json), built by
+     dev/site_record.py from what the pod printed (data/evidence/) and re-measured another way by a reviewer; the page's
+     text is checked against that record at build (`hypgraph check`). A figure goes in a data-fact slot; a phrase true by
+     design is marked data-ok="<why>" and listed on the page. Where a guarantee has a limit, the limit is here too (#limits). -->
 <a class="skip" href="#main">Skip to content</a>
 <header class="nav"><div class="wrap">
   <a class="brand" href="./"><img src="assets/hypdmz.svg" alt=""><span>Hyp<b>DMZ</b></span></a>
   <nav aria-label="Site" id="sitenav"><a href="#how">How it works</a><a href="#floor">The floor</a><a href="#proof">Proof</a>
-    <a href="#policy" class="hide-sm">Policy</a><a href="#start" class="hide-sm">Quick start</a>
+    <a href="#evidence">Record</a><a href="#policy" class="hide-sm">Policy</a><a href="#start" class="hide-sm">Quick start</a>
     <a href="https://hypswarm.com" class="hide-sm">HypSwarm</a><a href="https://hypgraph.com" class="hide-sm">HypGraph</a>
     <button class="iconbtn" data-toggle-theme type="button" aria-label="Toggle light and dark">◐</button></nav>
 </div></header>
@@ -36,9 +39,10 @@
     <div>
       <div class="hero-tags"><span class="pill accent">private beta</span><span class="pill">runs HypSwarm</span>
         <span class="pill">Podman · Windows / Linux / macOS</span><span class="pill">host needs Python <code>3.9+</code>, nothing else</span></div>
-      <h1>The swarm can reach one host. You can prove it.</h1>
+      <h1>The swarm can reach one host. <span data-ok="the egress check runs from the swarm's own seat on every start, and this page's figures are claims in a record of their own (#evidence)">You can prove it.</span></h1>
       <p class="lede">HypDMZ runs a <a href="https://hypswarm.com">HypSwarm</a> research swarm inside a pod whose only way
-        out is a proxy that allows the model API and nothing else, holds the API key the swarm never sees, decrypts
+        out is a proxy that allows the model API and nothing else, <span data-ok="the swarm's environment holds a placeholder; the proxy sets the key (CL2 counts the calls)">holds the API key the swarm
+        never sees</span>, decrypts
         every request to check it, and chains every call into a tamper-evident log. The record the swarm builds is a
         <a href="https://hypgraph.com">HypGraph</a> record, served live. Every start ends with the swarm trying to
         escape, from its own seat, and the pod refusing to run if it can.</p>
@@ -127,10 +131,10 @@
   <h2 class="h">Every HTTPS request is opened, read, and either forwarded or refused.</h2>
   <p class="sub">The swarm's client sends <code>CONNECT</code>. The proxy answers with a leaf certificate it mints under
     the HypDMZ CA, which only the swarm trusts, so the tunnel is plaintext to the proxy and nothing passes through it
-    unread. A tunnel the proxy cannot open is refused, never passed blind.</p>
+    unread. <span data-ok="design: handle_client refuses CONNECT when TLS interception is unavailable; no opaque tunnel path exists">A tunnel the proxy cannot open is refused, never passed blind.</span></p>
   <div class="pipe">
-    <div class="p"><h3>Host check</h3><p><code>CONNECT host:443</code> against the allowlist. An unlisted host never gets a tunnel.</p><div class="deny">default-deny</div></div>
-    <div class="p"><h3>TLS interception</h3><p>A leaf cert for the host, signed by the pod's own CA. The key never leaves the proxy.</p><div class="deny">no CA → no tunnel</div></div>
+    <div class="p"><h3>Host check</h3><p><code>CONNECT host:443</code> against the allowlist. <span data-ok="design: the CONNECT host check runs before any tunnel is opened, and the policy is default-deny">An unlisted host never gets a tunnel.</span></p><div class="deny">default-deny</div></div>
+    <div class="p"><h3>TLS interception</h3><p>A leaf cert for the host, signed by the pod's own CA. <span data-ok="design: the CA private key sits in a mount only the proxy container has; probe ca-private-key checks it from the swarm's seat">The key never leaves the proxy.</span></p><div class="deny">no CA → no tunnel</div></div>
     <div class="p"><h3>Firewall rule</h3><p>Method, path prefix, port, time box, request shape: URL length, query size, no opaque base64 runs, no secrets in the URL.</p><div class="deny">gate:… / rule:…</div></div>
     <div class="p"><h3>Hourly caps</h3><p>Forwarded calls and request megabytes over every rule, sliding hour, from the same policy file. The pod's cap on the process, under HypSwarm's own budget.</p><div class="deny">limit:calls_per_hour</div></div>
     <div class="p"><h3>DLP</h3><p>Body, <code>Authorization</code> and <code>Cookie</code> scanned for API keys, tokens, private keys. Block or log.</p><div class="deny">dlp:openai_key</div></div>
@@ -138,13 +142,13 @@
     <div class="p"><h3>Forward, stream, log</h3><p>Streamed upstream and back; retried only before the first byte reaches the client. Inbound DLP on the response. One line in the chain.</p></div>
   </div>
   <div class="trace">
-    <div class="t"><span class="hd">Allowed · what the swarm sent → what left the pod</span><b>POST</b> https://api.deepinfra.com<b>/v1/openai/chat/completions</b>
+    <div class="t" data-example="an illustrative exchange: the shape of one allowed call, not a measurement"><span class="hd">Allowed · what the swarm sent → what left the pod</span><b>POST</b> https://api.deepinfra.com<b>/v1/openai/chat/completions</b>
 Authorization: Bearer <span class="dim">__hypdmz_inject__</span>   <span class="dim">← the swarm's "key"</span>
 <span class="ok">rule model-api-deepinfra · path /v1/openai/ · DLP clean</span>
 <span class="ok">vault model_api_key · scope api.deepinfra.com · injected</span>
 Authorization: Bearer <span class="key">dk_••••••••••••••••</span>          <span class="dim">← set by the proxy</span>
 <span class="ok">200</span> · streamed · <span class="dim">audit #31 · prev_hash ✓</span></div>
-    <div class="t"><span class="hd">Refused · the same client, a different idea</span><b>CONNECT</b> example.com:443        <span class="bad">403 default-deny</span>
+    <div class="t" data-example="illustrative refusals with the codes the proxy answers; the counts are in the record, not here"><span class="hd">Refused · the same client, a different idea</span><b>CONNECT</b> example.com:443        <span class="bad">403 default-deny</span>
 <b>GET</b> https://api.deepinfra.com<b>/v1/me</b>    <span class="bad">403 model-api-deepinfra (path)</span>
 <b>POST</b> …/chat/completions  body has <span class="dim">sk-…</span>   <span class="bad">403 dlp:openai_key</span>
 <b>CONNECT</b> 127.0.0.1:8002 via the proxy  <span class="bad">403 default-deny</span>
@@ -152,13 +156,13 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
 <span class="dim">curl --noproxy '*' https://1.1.1.1</span>       <span class="bad">000 · the kernel dropped it</span>
 <span class="dim">each one is a line in the chain too</span></div>
   </div>
-  <div class="wf" id="key"><div class="wfh"><i></i>the key's path <span>· from your terminal to one header, never through an environment</span></div>
+  <div class="wf" id="key"><div class="wfh"><i></i>the key's path <span>· from your terminal to one header, <span data-ok="design: a podman secret is a mounted file; CL2 counts the key values in the proxy's environment (0)">never through an environment</span></span></div>
     <ol class="flow">
       <li><b>podman secret</b><span><code>podman secret create hypdmz_llm_api_key -</code> on the host; the launcher looks for it by name</span></li>
-      <li><b>/run/secrets/…</b><span>mounted into the proxy container alone, mode 0400, owned by the proxy UID; not in <code>podman inspect</code></span></li>
-      <li><b>vault</b><span>read once at first start, stored AES-256-GCM, master key in the proxy's data dir; the file is never read again</span></li>
+      <li><b>/run/secrets/…</b><span>mounted into the proxy container alone, <span data-ok="design constant: the launcher mounts the secret with mode=0400">mode 0400</span>, owned by the proxy UID; not in <code>podman inspect</code></span></li>
+      <li><b>vault</b><span>read at first start only, stored AES-256-GCM, master key in the proxy's data dir</span></li>
       <li><b>one header</b><span>set per allowed call, after the rule and the host scope agree; the swarm's placeholder is stripped first</span></li>
-      <li><b>audit</b><span><code>injected: ["model_api_key"]</code> on each line: the name, never the value</span></li>
+      <li><b>audit</b><span><code>injected: ["model_api_key"]</code> on each line: <span data-ok="design: audit.log_request writes the credential's name; no code path writes its value">the name, never the value</span></span></li>
     </ol>
     <div class="ref"><b>still possible:</b> <code>MODEL_API_KEY</code> in <code>.env</code> as a fallback — it passes through <code>--env</code>; the launcher tells you so and prefers the secret.</div>
   </div>
@@ -166,26 +170,26 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
 
 <section class="block" id="floor"><div class="wrap">
   <div class="kicker">Fail closed</div>
-  <h2 class="h">The order of events is the guarantee.</h2>
+  <h2 class="h">The order of events does the work.</h2>
   <p class="sub">A sandbox that becomes safe a moment after the agent starts is not one. In HypDMZ nothing the swarm
     could use exists until the floor is in place, and the pod checks itself from the inside before it lets the swarm run.</p>
   <ol class="ladder">
     <li><i>1</i><div><b>The controller applies the floor first.</b><span>Owner-UID rules on OUTPUT, IPv4 and IPv6, the control
       port closed to all but root and the proxy. If the rules don't apply, it exits, and nothing else will start.</span></div></li>
     <li><i>2</i><div><b>It publishes <code>LOCKED &lt;fingerprint&gt;</code> on <code>127.0.0.1:8009</code>.</b><span>A hash of the
-      live rule set. Every 30 s it recomputes the hash; on drift it logs and re-applies.</span></div></li>
-    <li><i>3</i><div><b>The swarm container waits for <code>LOCKED</code>.</b><span>Up to 60 s. Without it, the entrypoint exits
+      live rule set. <span data-ok="design constant: HYPDMZ_LOCKDOWN_HEARTBEAT_S defaults to 30">Every 30 s</span> it recomputes the hash; on drift it logs and re-applies.</span></div></li>
+    <li><i>3</i><div><b>The swarm container waits for <code>LOCKED</code>.</b><span><span data-ok="design constant: HYPDMZ_LOCKDOWN_TIMEOUT_S defaults to 60">Up to 60 s.</span> Without it, the entrypoint exits
       before any user code runs. There is no window in which the swarm can dial out directly.</span></div></li>
     <li><i>4</i><div><b>It checks that it cannot write its own code.</b><span>As the swarm user, with <code>access(2)</code>, over
       <code>site-packages</code>, <code>/usr/local/bin</code> and the entrypoint. Anything writable → it refuses to start.</span></div></li>
     <li><i>5</i><div><b>It trusts the CA certificate, not the key.</b><span>The swarm mounts <code>certs/public/</code> only. The
-      private key stays in the proxy's mount, mode 0600, owned by the proxy UID.</span></div></li>
+      private key stays in the proxy's mount, <span data-ok="design constant: tls_mitm.init_ca writes the key with mode 0600">mode 0600</span>, owned by the proxy UID.</span></div></li>
     <li><i>6</i><div><b>It runs in a box with edges.</b><span>Read-only root filesystem; <code>/tmp</code> and its home are
       size-capped tmpfs; memory, CPU and process count are capped on the cgroup. Only <code>/records</code> and <code>/work</code>
       persist. A runaway script runs out of room, not the machine.</span></div></li>
-    <li class="stop"><i>✕</i><div><b><code>hypdmz up</code> ends by trying to escape.</b><span>Twenty-one probes: nineteen as the swarm
-      user inside the swarm container, two from the host against the control API. One success stops the swarm container;
-      the command exits non-zero. A probe that never reports counts as a failure.</span></div></li>
+    <li class="stop"><i>✕</i><div><b><code>hypdmz up</code> ends by trying to escape.</b><span><span data-fact="probes-n"></span> probes, most as the swarm user inside the swarm container and the console pair from the host. One success stops the swarm container;
+      the command exits non-zero. A probe with no
+      report counts as a failure.</span></div></li>
   </ol>
 </div></section>
 
@@ -250,14 +254,32 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <p class="sub"><code>hypdmz run examples/first-swarm --python</code>: two seats, a t-test on a CSV, every computation run by
     the swarm's own Python tool inside the locked container and re-run by the record's instrument before review.</p>
   <div class="grid4">
-    <div class="card fact"><div class="k">Probes</div><div class="v">21 / 21</div><div class="s">11 escape routes blocked · 4 limits present · 4 controls reachable · the console 401 without its token, 200 with</div></div>
-    <div class="card fact"><div class="k">Model calls, each with the vaulted key</div><div class="v">31 / 31</div><div class="s">the swarm never held it; the proxy set it on every call</div></div>
-    <div class="card fact"><div class="k">Questions settled · claims checked</div><div class="v">2 / 2</div><div class="s">instrument confirmed 4/4, 9/9 and 7/7 registered values</div></div>
-    <div class="card fact"><div class="k">Audit chain</div><div class="v">verified<small>84 events</small></div><div class="s">0 DLP findings · every denial a probe or the cap test</div></div>
+    <div class="card fact"><div class="k">Probes</div><div class="v" data-fact="probes"></div><div class="s" data-fact="probes-s"></div><div class="src" data-claim="probes"></div></div>
+    <div class="card fact"><div class="k">Model calls, each with the vaulted key</div><div class="v" data-fact="injected"></div><div class="s" data-fact="injected-s"></div><div class="src" data-claim="key"></div></div>
+    <div class="card fact"><div class="k">Swarms settled inside the pod</div><div class="v" data-fact="swarms"></div><div class="s" data-fact="swarms-s"></div><div class="src" data-claim="swarms"></div></div>
+    <div class="card fact"><div class="k">Audit chain</div><div class="v"><span data-fact="chain"></span><small data-fact="chain-events"></small></div><div class="s" data-fact="chain-s"></div><div class="src" data-claim="chain"></div></div>
   </div>
-  <div class="measured"><span class="pill">measured 2026-10-29</span><span class="pill">Windows 11 · Podman Desktop · WSL2</span>
-    <span class="pill">DeepSeek-V4.1-Flash via DeepInfra</span><span class="pill">92 s · $0.03</span><span class="pill">again under the caps: 76 s · 21 calls · $0.02</span>
-    <span>One run on one machine. The numbers are what it printed, not a target. Re-run the check yourself: <code>hypdmz egress-check --json</code>.</span></div>
+  <div class="measured"><span class="pill" data-fact="measured"></span><span class="pill">Windows 11 · Podman Desktop · WSL2</span>
+    <span class="pill">DeepSeek-V4.1-Flash via DeepInfra</span><span class="pill" data-fact="edges-s"></span>
+    <span>One pod on one machine. Every figure above is a claim in <a href="#evidence">this page's own record</a>, bound to what the pod
+      printed and re-measured another way. Re-run the check yourself: <code>hypdmz egress-check --json</code>.</span></div>
+</div></section>
+
+<section class="block" id="evidence"><div class="wrap">
+  <div class="kicker">The record behind this page</div>
+  <h2 class="h">Don't take the page's word for it. Take the record's.</h2>
+  <p class="sub">The figures above are claims in a <a href="https://hypgraph.com">HypGraph</a> record built from the files the pod
+    printed: the probe output, the audit chain, the containers' configuration, the swarms' own records. Each claim is bound
+    to the measurement it came from, and a reviewer re-measured each another way before the page was published. The two
+    swarm runs are here too, replayable, with every model call and tool call in their lanes. The chain is verified in your
+    browser when it loads.</p>
+  <div class="stage" id="stage">
+    <div class="stage-bar"><div class="stage-tabs" role="group" aria-label="Choose a record" id="stage-tabs"></div>
+      <span class="pill" id="stage-chain">verifying…</span></div>
+    <div class="stage-app"><div id="app"></div></div>
+    <div class="stage-foot" id="stage-foot"></div>
+  </div>
+  <div id="record-claims" style="margin-top:24px"></div>
 </div></section>
 
 <section class="block" id="policy"><div class="wrap">
@@ -279,7 +301,7 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
         malformed file denies everything until it is fixed, and says so on <code>GET /api/policy</code>.</li>
       <li><b>Narrow by default.</b> Host, ports, methods, path prefixes. The DeepInfra key is account-wide, so <code>/v1/me</code>,
         <code>/deploy/</code> and billing stay closed even though the key could open them.</li>
-      <li><b>Guards for broad hosts.</b> <code>"guard": "public_web"</code> makes a rule GET/HEAD only, DNS names on 443/80, public
+      <li><b>Guards for broad hosts.</b> <code>"guard": "public_web"</code> makes a rule GET/HEAD only, DNS names on <span data-ok="design constant: request_gates.WEB_PORTS = {80, 443}">443/80</span>, public
         addresses only, no long opaque strings in the URL. <code>expires_at</code> time-boxes a rule; a bad date fails closed.</li>
       <li><b>Credentials by name.</b> A rule says which vault entry to inject; the entry's own host scope must agree. The
         key reaches the proxy once, on the first start, and lives in the vault after that.</li>
@@ -303,14 +325,14 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
       status, sizes, latency, DLP findings, which credential was injected. Never the body. One chained JSONL file, optional
       remote sink (Splunk, Loki, anything that takes JSON).</p></div>
     <div class="card"><div class="n">what you keep</div><h3>Everything, locally</h3><p>Records, work folders, the vault and
-      the audit live in a machine-local state directory outside the repo, never in a cloud-synced folder. The pod can be
+      the audit live in a machine-local state directory outside the repo and outside cloud-synced folders (doctor fails if it isn't). The pod can be
       torn down and rebuilt without losing any of it.</p></div>
   </div>
 </div></section>
 
 <section class="block" id="limits"><div class="wrap">
   <div class="kicker">Honest limits</div>
-  <h2 class="h">Where the guarantee ends today.</h2>
+  <h2 class="h">Where the protection ends today.</h2>
   <div class="grid3 limits">
     <div class="card"><h3>What the host can see</h3><p>The record UI on <code>:8000</code> answers to anything on the host's
       loopback, and the control API's token lives in your state directory, where anything running as you can read it.
@@ -327,7 +349,7 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
 <section class="block qs" id="start"><div class="wrap">
   <div class="kicker">Quick start</div>
   <h2 class="h">Six commands from nothing to a verified swarm.</h2>
-  <p class="sub">Podman on the host (Podman Desktop on Windows and macOS, <code>podman</code> on Linux) and Python 3.9 for the
+  <p class="sub">Podman on the host (Podman Desktop on Windows and macOS, <code>podman</code> on Linux) and <span data-ok="design constant: pyproject requires-python >= 3.9">Python 3.9</span> for the
     launcher, which has no dependencies. The images bring everything else.</p>
   <div class="code"><button class="copy" type="button" data-copy>copy</button>
 <pre>pip install -e .                 <span class="c"># the launcher; or run it as python -m hypdmz</span>
@@ -346,7 +368,7 @@ hypdmz egress-check --json       <span class="c"># any time; exit 1 on a single 
   <div class="family">
     <a href="https://hypgraph.com"><b>HypGraph</b><span>The record: append-only, hash-chained, checks claims against measurements, refuses overclaims. The engine and the UI.</span></a>
     <a href="https://hypswarm.com"><b>HypSwarm</b><span>Many agents, one record. The scheduler is code, the instrument re-runs what authors computed, the record decides what is done.</span></a>
-    <a href="./"><b>HypDMZ</b><span>The pod the swarm runs in: one way out, every byte checked, proven from the inside on every start.</span></a>
+    <a href="#evidence" data-show="page"><b>HypDMZ</b><span>The pod the swarm runs in: one way out, every byte checked, tested from the inside on every start — and this page's figures in a record of their own.</span></a>
   </div>
 </div></section>
 </main>
@@ -364,6 +386,7 @@ hypdmz egress-check --json       <span class="c"># any time; exit 1 on a single 
       var next = root.dataset.theme === 'dark' ? 'light' : 'dark';
       root.dataset.theme = next;
       try { localStorage.setItem('hg-theme', next); } catch (e) {}
+      window.dispatchEvent(new CustomEvent('hg-theme', { detail: next }));
     });
   });
   document.querySelectorAll('[data-copy]').forEach(function (b) {
@@ -377,7 +400,7 @@ hypdmz egress-check --json       <span class="c"># any time; exit 1 on a single 
   var links = Array.prototype.slice.call(document.querySelectorAll('#sitenav a[href^="#"]'));
   var byId = {};
   links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
-  var order = ['how', 'floor', 'can', 'proof', 'policy', 'record', 'limits', 'start'];
+  var order = ['how', 'floor', 'can', 'proof', 'evidence', 'policy', 'record', 'limits', 'start'];
   var owner = { can: 'floor', record: 'policy', limits: 'policy' };
   if ('IntersectionObserver' in window) {
     var visible = {};
@@ -396,5 +419,12 @@ hypdmz egress-check --json       <span class="c"># any time; exit 1 on a single 
   }
 })();
 </script>
+<script src="app/vendor/cytoscape.min.js" defer></script>
+<script src="app/vendor/layout-base.js" defer></script>
+<script src="app/vendor/cose-base.js" defer></script>
+<script src="app/vendor/cytoscape-fcose.js" defer></script>
+<script src="app/hypgraph.js" defer></script>
+<script src="assets/site-data.js" defer></script>
+<script src="assets/home.js" defer></script>
 </body>
 </html>

@@ -413,11 +413,21 @@ def _link_to_rules(cred_name: str, rule_names: list[str]) -> None:
 def _bootstrap_from_env() -> None:
     existing = {c["name"] for c in list_credentials()}
     for name, env, type_, spec, scope, rule_links in _BOOTSTRAP_RECIPES:
-        val = (os.getenv(env) or "").strip()
+        # Preferred: a podman secret mounted as a file (never in the environment, never in `podman inspect`),
+        # named by <ENV>_FILE. Fallback: the environment variable itself.
+        val, source = "", ""
+        path = (os.getenv(env + "_FILE") or "").strip()
+        if path:
+            try:
+                val, source = Path(path).read_text(encoding="utf-8").strip(), f"secret file {path}"
+            except OSError as e:
+                print(f"[vault] {env}_FILE={path} unreadable: {e}")
+        if not val:
+            val, source = (os.getenv(env) or "").strip(), f"env {env}"
         if not val or val == "__hypdmz_inject__":
             continue
         if name in existing:
-            print(f"[vault] {env} present but '{name}' already vaulted — ignoring (remove from .env)")
+            print(f"[vault] {source} present but '{name}' already vaulted — ignoring it")
             _link_to_rules(name, rule_links)  # keep links fresh even if already vaulted
             continue
         try:
@@ -426,7 +436,7 @@ def _bootstrap_from_env() -> None:
                  "injection_spec": spec, **scope},
                 actor="bootstrap:env",
             )
-            print(f"[vault] bootstrapped credential '{name}' from {env}")
+            print(f"[vault] bootstrapped credential '{name}' from {source}")
             _link_to_rules(name, rule_links)
         except Exception as e:
             print(f"[vault] bootstrap failed for {name}: {e}")

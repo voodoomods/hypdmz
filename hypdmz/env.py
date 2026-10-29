@@ -151,6 +151,13 @@ class Config:
     def model_api_key(self) -> str:
         return self.env.get("MODEL_API_KEY", "")
 
+    @property
+    def key_secret(self) -> str:
+        """The podman secret holding the model API key (preferred over MODEL_API_KEY in .env):
+        `podman secret create hypdmz_llm_api_key -` then paste the key. Mounted as a file into the proxy
+        container only; never in any container's environment or `podman inspect`."""
+        return self.env.get("HYPDMZ_KEY_SECRET") or "hypdmz_llm_api_key"
+
     # ── host ports (the pod's own ports never change: 8000 UI, 8002 console, 8080 proxy) ──
     def _port(self, key: str, default: int) -> int:
         try:

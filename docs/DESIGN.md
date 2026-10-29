@@ -57,8 +57,10 @@ does not hold: the API key, the CA key, the vault, the audit log, the policy.
 
 ## Known limits (honest)
 
-- The API key passes through `podman run --env` to the proxy on the first `up` (visible in `podman inspect`
-  until the line is removed from `.env` and the pod restarted). A podman secret would be better; next step.
+- The API key's first mile is a podman secret (`hypdmz_llm_api_key`, `HYPDMZ_KEY_SECRET`), mounted into the
+  proxy container as `/run/secrets/<name>` with mode 0400 for the proxy UID and read once into the vault; it is
+  in no container's environment and not in `podman inspect`. The `.env` fallback (`MODEL_API_KEY`) still passes
+  through `--env` and is visible in `inspect` until removed; the launcher says so and prefers the secret.
 - On Windows and macOS the state dir is a 9p/virtiofs mount: file ownership is not enforced there, so the
   "swarm cannot read the CA key" guarantee rests on the swarm container mounting `certs/public/` only — which
   `egress-check` verifies — not on file modes.

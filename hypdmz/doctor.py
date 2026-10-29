@@ -44,12 +44,18 @@ def _check_state_dir(cfg: Config) -> PreflightResult:
 
 
 def _check_model_key(cfg: Config) -> PreflightResult:
+    from hypdmz.runner import secret_exists
+
     vault = cfg.proxy_data_dir / "vault.db"
+    if secret_exists(cfg.key_secret):
+        return PreflightResult("model API key", True, f"podman secret '{cfg.key_secret}' (mounted into the proxy only)")
     if cfg.model_api_key:
-        return PreflightResult("model API key", True, "MODEL_API_KEY set; vaulted on the next `up` — then delete the line")
+        return PreflightResult("model API key", True, "MODEL_API_KEY in .env; vaulted on the next `up` — then delete the "
+                               f"line (better: podman secret create {cfg.key_secret} -)")
     if vault.exists():
-        return PreflightResult("model API key", True, "not in .env; the vault exists (hypdmz status shows the count)")
-    return PreflightResult("model API key", False, "MODEL_API_KEY not set and no vault yet")
+        return PreflightResult("model API key", True, "no secret, not in .env; the vault exists (hypdmz status shows the count)")
+    return PreflightResult("model API key", False,
+                           f"no key: `podman secret create {cfg.key_secret} -` (paste it), or MODEL_API_KEY in .env")
 
 
 def _check_build_inputs(cfg: Config) -> PreflightResult:

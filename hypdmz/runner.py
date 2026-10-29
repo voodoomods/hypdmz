@@ -73,8 +73,16 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
     print(f"[hypdmz] state:   {cfg.state_dir}")
     print(f"[hypdmz] records: {cfg.records_dir}")
     print(f"[hypdmz] model:   {cfg.model} via {cfg.model_base_url}")
-    if not cfg.model_api_key:
-        print("[hypdmz] note: MODEL_API_KEY not set — fine if the key is already in the vault "
+    secret = cfg.key_secret if (dry_run or secret_exists(cfg.key_secret)) else ""
+    if secret:
+        print(f"[hypdmz] key:     podman secret '{secret}' (mounted into the proxy as a file; never in an environment)")
+        if cfg.model_api_key:
+            print(f"[hypdmz] note: MODEL_API_KEY in {cfg.env_file} is ignored while the secret exists — remove it")
+    elif cfg.model_api_key:
+        print(f"[hypdmz] key:     MODEL_API_KEY from .env — prefer a podman secret: "
+              f"podman secret create {cfg.key_secret} -")
+    else:
+        print("[hypdmz] note: no key in a podman secret or .env — fine if the vault already holds it "
               "(hypdmz status shows the count)")
 
     if not dry_run:
@@ -100,14 +108,21 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
         "HYPDMZ_LEAF_CACHE": "/app/data/leaf-certs",
         "VAULT_DB_PATH": "/app/data/vault.db",
         "VAULT_MASTER_KEY": "/app/data/.master.key",
-        "VAULT_BOOTSTRAP_MODEL": cfg.model_api_key,
         "VAULT_BOOTSTRAP_MODEL_HOST": cfg.model_host,
         **{k: v for k, v in cfg.hardening_env().items() if v},
     }
+    secret_args: list[str] = []
+    if secret:
+        # The key arrives as a file the proxy UID alone can read, and the proxy vaults it on first start.
+        secret_args = ["--secret", f"{secret},type=mount,uid={PROXY_UID},gid={PROXY_UID},mode=0400"]
+        proxy_env["VAULT_BOOTSTRAP_MODEL_FILE"] = f"/run/secrets/{secret}"
+    elif cfg.model_api_key:
+        proxy_env["VAULT_BOOTSTRAP_MODEL"] = cfg.model_api_key
     _do(["podman", "run", "-d", "--pod", POD_NAME, "--name", PROXY,
          *_volume(platform, cfg.repo_root / "proxy" / "config", "/app/config", readonly=True),
          *_volume(platform, cfg.proxy_data_dir, "/app/data"),
          *_volume(platform, cfg.cert_dir, "/etc/hypdmz-certs", readonly=True),
+         *secret_args,
          *_envs(proxy_env), "hypdmz-proxy:latest"], dry_run, redact=("VAULT_BOOTSTRAP_MODEL",))
 
     swarm_env = {
@@ -135,7 +150,7 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
     print(f"\n[hypdmz] pod is up.\n  record UI  → http://127.0.0.1:{cfg.ui_port}\n"
           f"  console    → http://127.0.0.1:{cfg.console_port}\n"
           f"  proxy      → http://127.0.0.1:{cfg.proxy_port}  (host tools: trust {cfg.ca_cert_path})")
-    if cfg.model_api_key:
+    if cfg.model_api_key and not secret:
         print(f"[hypdmz] MODEL_API_KEY was handed to the vault — remove it from {cfg.env_file} now.")
     if skip_egress_check:
         print("[hypdmz] egress check skipped (--skip-egress-check).")
@@ -246,6 +261,11 @@ def cmd_debug(cfg: Config, platform: Platform) -> int:
 
 
 # ── helpers ───────────────────────────────────────────────────────────
+
+def secret_exists(name: str) -> bool:
+    rc, _, _ = run_capture(["podman", "secret", "exists", name])
+    return rc == 0
+
 
 def _do(args: list[str], dry_run: bool, *, redact: tuple[str, ...] = ()) -> None:
     if dry_run:

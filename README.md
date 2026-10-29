@@ -27,9 +27,10 @@ Needs Podman (Podman Desktop on Windows/macOS, `podman` on Linux) and Python 3.9
 
 ```bash
 pip install -e .                       # or: python -m hypdmz …
-hypdmz doctor                          # prints the state dir; copy .env.example there as .env and set MODEL_API_KEY
+hypdmz doctor                          # prints the state dir; copy .env.example there as .env
+podman secret create hypdmz_llm_api_key -   # paste the model API key; it reaches the proxy only, as a file
 hypdmz build                           # three images
-hypdmz up                              # creates the CA, starts the pod, verifies the egress floor
+hypdmz up                              # creates the CA, starts the pod, vaults the key, verifies the egress floor
 hypdmz run examples/first-swarm --python --budget-usd 0.20
 ```
 
@@ -47,7 +48,7 @@ state dir); `--record NAME` writes a separate file instead.
 | | |
 |---|---|
 | Reach the model API | yes — through the proxy, `MODEL_BASE_URL` only, inference paths only (`proxy/config/firewall.json`) |
-| See the API key | no — it sends a placeholder; the proxy's vault (AES-256-GCM, master key in `proxy-data/`) adds the real one, scoped to the model host |
+| See the API key | no — it sends a placeholder; the proxy's vault (AES-256-GCM, master key in `proxy-data/`) adds the real one, scoped to the model host. The key arrives as a podman secret mounted into the proxy alone (mode 0400, proxy UID), never in an environment |
 | Reach any other host, by name, by IP, over IPv6, via DNS | no — iptables owner match, verified by `egress-check` |
 | Reach the proxy's control API | no — `:8002` is open to root and the proxy UID only |
 | Read the TLS interception CA's private key | no — the swarm mounts the certificate alone |

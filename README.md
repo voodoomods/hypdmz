@@ -23,7 +23,7 @@ swarm if any escape probe succeeds.
 
 ## Quick start
 
-Needs Podman on the host (Podman Desktop on Windows and macOS, `podman` on Linux) and Python 3.9+. The launcher
+Needs Podman on the host (Podman Desktop on Windows and macOS, `podman` on Linux) and Python 3.10+. The launcher
 has no dependencies; the three image build contexts, the default policy and an example ride inside the package.
 
 ```bash

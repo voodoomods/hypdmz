@@ -132,6 +132,7 @@
     <div class="p"><h3>Host check</h3><p><code>CONNECT host:443</code> against the allowlist. An unlisted host never gets a tunnel.</p><div class="deny">default-deny</div></div>
     <div class="p"><h3>TLS interception</h3><p>A leaf cert for the host, signed by the pod's own CA. The key never leaves the proxy.</p><div class="deny">no CA → no tunnel</div></div>
     <div class="p"><h3>Firewall rule</h3><p>Method, path prefix, port, time box, request shape: URL length, query size, no opaque base64 runs, no secrets in the URL.</p><div class="deny">gate:… / rule:…</div></div>
+    <div class="p"><h3>Hourly caps</h3><p>Forwarded calls and request megabytes over every rule, sliding hour, from the same policy file. The pod's cap on the process, under HypSwarm's own budget.</p><div class="deny">limit:calls_per_hour</div></div>
     <div class="p"><h3>DLP</h3><p>Body, <code>Authorization</code> and <code>Cookie</code> scanned for API keys, tokens, private keys. Block or log.</p><div class="deny">dlp:openai_key</div></div>
     <div class="p"><h3>Credential</h3><p>The rule names a vault entry; the proxy decrypts it, checks its host scope, and sets the header. The swarm's placeholder is stripped.</p><div class="deny" style="color:var(--ok)">no entry → sent without a key</div></div>
     <div class="p"><h3>Forward, stream, log</h3><p>Streamed upstream and back; retried only before the first byte reaches the client. Inbound DLP on the response. One line in the chain.</p></div>
@@ -147,6 +148,7 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
 <b>GET</b> https://api.deepinfra.com<b>/v1/me</b>    <span class="bad">403 model-api-deepinfra (path)</span>
 <b>POST</b> …/chat/completions  body has <span class="dim">sk-…</span>   <span class="bad">403 dlp:openai_key</span>
 <b>CONNECT</b> 127.0.0.1:8002 via the proxy  <span class="bad">403 default-deny</span>
+<b>POST</b> …/chat/completions, call 1,201 this hour  <span class="bad">429 limit:calls_per_hour</span>
 <span class="dim">curl --noproxy '*' https://1.1.1.1</span>       <span class="bad">000 · the kernel dropped it</span>
 <span class="dim">each one is a line in the chain too</span></div>
   </div>
@@ -178,9 +180,12 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
       <code>site-packages</code>, <code>/usr/local/bin</code> and the entrypoint. Anything writable → it refuses to start.</span></div></li>
     <li><i>5</i><div><b>It trusts the CA certificate, not the key.</b><span>The swarm mounts <code>certs/public/</code> only. The
       private key stays in the proxy's mount, mode 0600, owned by the proxy UID.</span></div></li>
-    <li class="stop"><i>✕</i><div><b><code>hypdmz up</code> ends by trying to escape.</b><span>Fifteen probes run as the swarm user
-      inside the swarm container. One success stops the swarm container; the command exits non-zero. A probe that never
-      reports counts as a failure.</span></div></li>
+    <li><i>6</i><div><b>It runs in a box with edges.</b><span>Read-only root filesystem; <code>/tmp</code> and its home are
+      size-capped tmpfs; memory, CPU and process count are capped on the cgroup. Only <code>/records</code> and <code>/work</code>
+      persist. A runaway script runs out of room, not the machine.</span></div></li>
+    <li class="stop"><i>✕</i><div><b><code>hypdmz up</code> ends by trying to escape.</b><span>Twenty-one probes: nineteen as the swarm
+      user inside the swarm container, two from the host against the control API. One success stops the swarm container;
+      the command exits non-zero. A probe that never reports counts as a failure.</span></div></li>
   </ol>
 </div></section>
 
@@ -194,7 +199,9 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
       <tr><td>sees the API key</td><td><span class="v no">no</span></td><td>it sends a placeholder; the vault (AES-256-GCM, master key in the proxy's data dir) adds the real one, scoped to the model host. The key arrives as a <a href="#key">podman secret</a> mounted into the proxy alone.<span class="how">Checked in the audit: every allowed call carries <code>injected: ["model_api_key"]</code>; the swarm's environment holds <code>__hypdmz_inject__</code>; the proxy's environment holds a path, not a key.</span></td></tr>
       <tr><td>reaches any other host — by name, by IP, over IPv6</td><td><span class="v no">no</span></td><td>owner-UID match in the kernel; the proxy's allowlist is the second wall.<span class="how">Probes <span class="probe">direct-https-by-name · direct-https-by-ip · direct-http-by-ip · direct-ipv6 · proxy-denies-unlisted</span></span></td></tr>
       <tr><td>resolves names</td><td><span class="v no">no</span></td><td>DNS is an exfiltration channel; only the proxy UID may use port 53.<span class="how">Probes <span class="probe">direct-dns-public · pod-resolver-dns</span></span></td></tr>
-      <tr><td>reaches the proxy's control API</td><td><span class="v no">no</span></td><td><code>:8002</code> is open to root and the proxy UID only; relaying through the proxy hits default-deny.<span class="how">Probes <span class="probe">proxy-control-api · proxy-relay-to-console</span></span></td></tr>
+      <tr><td>reaches the proxy's control API</td><td><span class="v no">no</span></td><td><code>:8002</code> is open to root and the proxy UID only; relaying through the proxy hits default-deny. From the host it wants a bearer token generated into your state directory.<span class="how">Probes <span class="probe">proxy-control-api · proxy-relay-to-console · console-requires-token · console-with-token</span></span></td></tr>
+      <tr><td>calls the model without limit</td><td><span class="v no">no</span></td><td>the proxy caps forwarded calls and request megabytes per sliding hour, over every rule; past the cap, 429, audited as <code>limit:…</code>.<span class="how">Tested live with the cap set to one call: <code>429 X-Proxy-Rule: limit:calls_per_hour</code>, three audit rows, then the cap restored.</span></td></tr>
+      <tr><td>exhausts the machine</td><td><span class="v no">no</span></td><td>read-only root filesystem, size-capped <code>/tmp</code> and home, memory, CPU and process-count limits on the container's cgroup.<span class="how">Probes <span class="probe">swarm-rootfs-readonly · swarm-memory-capped · swarm-pids-capped · swarm-cpu-capped</span></span></td></tr>
       <tr><td>reads the CA private key</td><td><span class="v no">no</span></td><td>the swarm container mounts the certificate alone.<span class="how">Probe <span class="probe">ca-private-key</span></span></td></tr>
       <tr><td>rewrites its own code</td><td><span class="v no">no</span></td><td>root-owned, <code>go-w</code>, re-checked at every start as the swarm user.<span class="how">Probe <span class="probe">swarm-code-write</span></span></td></tr>
       <tr><td>sends a secret out</td><td><span class="v no">no</span></td><td>DLP over bodies and auth headers; <code>DLP_MODE=block</code> by default.<span class="how">Checked in the audit: <code>dlp_finding</code> on every line.</span></td></tr>
@@ -211,9 +218,10 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
     <em>reachable</em> must succeed, so the check cannot pass because networking is simply dead.</p>
   <div class="term"><div class="bar"><i></i><i></i><i></i><span>hypdmz egress-check · 2026-10-29</span></div>
 <pre><span class="hdr">── lockdown ──</span>
-  <span class="lock">LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-29T14:01:33Z denied_v4=0 denied_v6=0</span>
+  <span class="lock">LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-29T15:42:15Z denied_v4=0 denied_v6=0</span>
+  caps: 1200 calls/h · 300.0 MB/h · last hour: 1 calls, 0.0 MB
 
-<span class="hdr">── probes (run as the swarm user) ──</span>
+<span class="hdr">── probes (run as the swarm user; the two console probes from the host) ──</span>
   <span class="pass">[PASS]</span> direct-https-by-name     expect blocked   got 000    HTTPS to a public hostname, ignoring HTTPS_PROXY
   <span class="pass">[PASS]</span> direct-https-by-ip       expect blocked   got 000    HTTPS straight to an IP (no DNS needed)
   <span class="pass">[PASS]</span> direct-http-by-ip        expect blocked   got 000    Plain HTTP straight to an IP
@@ -225,10 +233,16 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <span class="pass">[PASS]</span> proxy-relay-to-console   expect blocked   got 403    Reach the control API by relaying through the proxy
   <span class="pass">[PASS]</span> ca-private-key           expect blocked   got fail   Read the egress CA's private key (only the proxy holds it)
   <span class="pass">[PASS]</span> swarm-code-write         expect blocked   got fail   Write its own code (hypswarm, the entrypoint)
+  <span class="pass">[PASS]</span> swarm-rootfs-readonly    expect reachable got ok     The container's root filesystem is mounted read-only
+  <span class="pass">[PASS]</span> swarm-memory-capped      expect reachable got ok     A memory limit is set on the container's cgroup
+  <span class="pass">[PASS]</span> swarm-pids-capped        expect reachable got ok     A process-count limit is set on the container's cgroup
+  <span class="pass">[PASS]</span> swarm-cpu-capped         expect reachable got ok     A CPU quota is set on the container's cgroup
   <span class="pass">[PASS]</span> lockdown-gate            expect reachable got ok     The controller reports LOCKED on the gate
   <span class="pass">[PASS]</span> record-ui                expect reachable got 200    The record UI answers on :8000
   <span class="pass">[PASS]</span> proxy-listener           expect reachable got 403    The proxy answers on :8080
   <span class="pass">[PASS]</span> proxy-upstream           expect reachable got 200    The model host through the proxy (api.deepinfra.com)
+  <span class="pass">[PASS]</span> console-requires-token   expect blocked   got 401    Control API without the bearer token (from the host)
+  <span class="pass">[PASS]</span> console-with-token       expect reachable got 200    Control API with the token from console.token
 
 <span class="pass">[hypdmz] egress floor verified: the swarm cannot bypass the proxy.</span></pre></div>
 
@@ -236,13 +250,13 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <p class="sub"><code>hypdmz run examples/first-swarm --python</code>: two seats, a t-test on a CSV, every computation run by
     the swarm's own Python tool inside the locked container and re-run by the record's instrument before review.</p>
   <div class="grid4">
-    <div class="card fact"><div class="k">Escape probes</div><div class="v">15 / 15</div><div class="s">blocked where they must be, reachable where they must be</div></div>
+    <div class="card fact"><div class="k">Probes</div><div class="v">21 / 21</div><div class="s">11 escape routes blocked · 4 limits present · 4 controls reachable · the console 401 without its token, 200 with</div></div>
     <div class="card fact"><div class="k">Model calls, each with the vaulted key</div><div class="v">31 / 31</div><div class="s">the swarm never held it; the proxy set it on every call</div></div>
     <div class="card fact"><div class="k">Questions settled · claims checked</div><div class="v">2 / 2</div><div class="s">instrument confirmed 4/4, 9/9 and 7/7 registered values</div></div>
-    <div class="card fact"><div class="k">Audit chain</div><div class="v">verified<small>46 events</small></div><div class="s">0 DLP findings · 3 denials, all of them the probes</div></div>
+    <div class="card fact"><div class="k">Audit chain</div><div class="v">verified<small>84 events</small></div><div class="s">0 DLP findings · every denial a probe or the cap test</div></div>
   </div>
   <div class="measured"><span class="pill">measured 2026-10-29</span><span class="pill">Windows 11 · Podman Desktop · WSL2</span>
-    <span class="pill">DeepSeek-V4.1-Flash via DeepInfra</span><span class="pill">92 s · $0.03</span>
+    <span class="pill">DeepSeek-V4.1-Flash via DeepInfra</span><span class="pill">92 s · $0.03</span><span class="pill">again under the caps: 76 s · 21 calls · $0.02</span>
     <span>One run on one machine. The numbers are what it printed, not a target. Re-run the check yourself: <code>hypdmz egress-check --json</code>.</span></div>
 </div></section>
 
@@ -298,14 +312,15 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <div class="kicker">Honest limits</div>
   <h2 class="h">Where the guarantee ends today.</h2>
   <div class="grid3 limits">
-    <div class="card"><h3>What the host can see</h3><p>The record UI on <code>:8000</code> and the control API on <code>:8002</code>
-      answer to anything on the host's loopback: the pod guards the swarm, not your laptop. And the <code>.env</code>
-      fallback for the key, if you use it instead of the secret, passes through <code>--env</code>.</p></div>
+    <div class="card"><h3>What the host can see</h3><p>The record UI on <code>:8000</code> answers to anything on the host's
+      loopback, and the control API's token lives in your state directory, where anything running as you can read it.
+      The pod guards the swarm, not your laptop. The <code>.env</code> fallback for the key passes through <code>--env</code>.</p></div>
     <div class="card"><h3>File ownership on Windows and macOS</h3><p>The state directory is a 9p / virtiofs mount, where modes
       and owners are not enforced. The swarm cannot read the CA key because it mounts a different directory, which
       <code>egress-check</code> verifies, not because of a file mode.</p></div>
-    <div class="card"><h3>One egress identity</h3><p>Every run shares the same rules and the same key. Per-run keys would need
-      per-run vault scopes, and in the proxy's log one run is told from another only by time.</p></div>
+    <div class="card"><h3>What is not capped</h3><p><code>/records</code> and <code>/work</code> are host folders podman cannot
+      size-limit. The hourly cap counts calls and bytes, not dollars; the model's price sets those, and HypSwarm's
+      <code>--budget-usd</code> is the finer control. Every run shares one egress identity and one key.</p></div>
   </div>
 </div></section>
 

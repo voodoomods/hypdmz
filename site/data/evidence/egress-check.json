@@ -1,0 +1,163 @@
+{
+  "ok": true,
+  "bypass_found": false,
+  "lockdown_state": "LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-29T15:57:00Z checked_at=2026-10-29T15:57:00Z denied_v4=0 denied_v6=0",
+  "caps": {
+    "calls_per_hour": 1200,
+    "megabytes_per_hour": 300.0,
+    "last_hour": {
+      "calls": 2,
+      "megabytes": 0.0
+    }
+  },
+  "error": null,
+  "results": [
+    {
+      "name": "direct-https-by-name",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "000",
+      "description": "HTTPS to a public hostname, ignoring HTTPS_PROXY"
+    },
+    {
+      "name": "direct-https-by-ip",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "000",
+      "description": "HTTPS straight to an IP (no DNS needed)"
+    },
+    {
+      "name": "direct-http-by-ip",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "000",
+      "description": "Plain HTTP straight to an IP"
+    },
+    {
+      "name": "direct-ipv6",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "000",
+      "description": "HTTPS over IPv6"
+    },
+    {
+      "name": "direct-dns-public",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "fail",
+      "description": "DNS query to a public resolver (an exfiltration channel)"
+    },
+    {
+      "name": "pod-resolver-dns",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "fail",
+      "description": "DNS via the pod's configured resolver"
+    },
+    {
+      "name": "proxy-control-api",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "000",
+      "description": "The proxy's control API on :8002 (policy, vault, audit)"
+    },
+    {
+      "name": "proxy-denies-unlisted",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "000",
+      "description": "A host not in firewall.json, through the proxy"
+    },
+    {
+      "name": "proxy-relay-to-console",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "403",
+      "description": "Reach the control API by relaying through the proxy"
+    },
+    {
+      "name": "ca-private-key",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "fail",
+      "description": "Read the egress CA's private key (only the proxy holds it)"
+    },
+    {
+      "name": "swarm-code-write",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "fail",
+      "description": "Write its own code (hypswarm, the entrypoint)"
+    },
+    {
+      "name": "swarm-rootfs-readonly",
+      "kind": "control",
+      "passed": true,
+      "observed": "ok",
+      "description": "The container's root filesystem is mounted read-only"
+    },
+    {
+      "name": "swarm-memory-capped",
+      "kind": "control",
+      "passed": true,
+      "observed": "ok",
+      "description": "A memory limit is set on the container's cgroup"
+    },
+    {
+      "name": "swarm-pids-capped",
+      "kind": "control",
+      "passed": true,
+      "observed": "ok",
+      "description": "A process-count limit is set on the container's cgroup"
+    },
+    {
+      "name": "swarm-cpu-capped",
+      "kind": "control",
+      "passed": true,
+      "observed": "ok",
+      "description": "A CPU quota is set on the container's cgroup"
+    },
+    {
+      "name": "lockdown-gate",
+      "kind": "control",
+      "passed": true,
+      "observed": "ok",
+      "description": "The controller reports LOCKED on the gate"
+    },
+    {
+      "name": "record-ui",
+      "kind": "control",
+      "passed": true,
+      "observed": "200",
+      "description": "The record UI answers on :8000"
+    },
+    {
+      "name": "proxy-listener",
+      "kind": "control",
+      "passed": true,
+      "observed": "403",
+      "description": "The proxy answers on :8080"
+    },
+    {
+      "name": "proxy-upstream",
+      "kind": "control",
+      "passed": true,
+      "observed": "200",
+      "description": "The model host through the proxy (api.deepinfra.com; the proxy UID has egress)"
+    },
+    {
+      "name": "console-requires-token",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "401",
+      "description": "Control API without the bearer token (from the host)"
+    },
+    {
+      "name": "console-with-token",
+      "kind": "control",
+      "passed": true,
+      "observed": "200",
+      "description": "Control API with the token from console.token"
+    }
+  ]
+}

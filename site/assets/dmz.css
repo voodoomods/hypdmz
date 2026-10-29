@@ -1,0 +1,101 @@
+/* hypdmz.com — page-specific rules on top of the family stylesheet (site.css). */
+
+/* ── hero: the pod diagram ── */
+.hero { padding-bottom: 48px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 36px; align-items: center; }
+@media (max-width: 960px) { .hero-grid { grid-template-columns: 1fr; } }
+.pod { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-lg); padding: 14px 14px 8px; }
+.pod svg { width: 100%; height: auto; display: block; font-family: var(--mono); }
+.pod .cap { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font: 12px var(--mono); color: var(--ink3); padding: 8px 4px 2px; }
+.pod .cap b { color: var(--ink2); font-weight: 600; }
+/* svg colours follow the theme */
+.pod .box { fill: var(--surface2); stroke: var(--line2); }
+.pod .box.swarm { stroke: var(--info); }
+.pod .box.proxy { stroke: var(--accent); }
+.pod .box.ctl { stroke: var(--ink3); }
+.pod .lbl { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.pod .sub { fill: var(--ink3); font-size: 10px; }
+.pod .wall { fill: var(--ink3); opacity: .55; }
+.pod .gate { fill: var(--ok); }
+.pod .lane { stroke: var(--ok); stroke-width: 2; fill: none; }
+.pod .try { stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 3 4; fill: none; opacity: .8; }
+.pod .pkt { fill: var(--ok); }
+.pod .pkt.bad { fill: var(--bad); }
+.pod .x { stroke: var(--bad); stroke-width: 2; stroke-linecap: round; opacity: 0; }
+.pod .cloud { fill: var(--sunken); stroke: var(--line2); }
+.pod .host { fill: var(--ink2); font-size: 11px; }
+.pod .tag { fill: var(--ink3); font-size: 9.5px; letter-spacing: .04em; }
+.pod .ring { fill: none; stroke: var(--ok); stroke-width: 1.5; opacity: .7; }
+
+/* ── the rule band ── */
+.rule-band { background: var(--surface2); }
+.rule-band .big { font-size: clamp(22px, 2.6vw, 30px); font-weight: 700; letter-spacing: -.02em; line-height: 1.25; max-width: 30ch; margin: 0 0 10px; }
+.rule-band .big em { color: var(--accent); font-style: normal; }
+
+/* ── the request pipeline ── */
+.pipe { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; counter-reset: p; }
+.pipe .p { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 16px 14px; box-shadow: var(--shadow); }
+.pipe .p::before { counter-increment: p; content: counter(p, decimal-leading-zero); font: 600 11px var(--mono); color: var(--accent); letter-spacing: .08em; }
+.pipe .p h3 { margin: 6px 0 4px; font-size: 15px; letter-spacing: -.01em; }
+.pipe .p p { margin: 0; font-size: 13.5px; color: var(--ink2); }
+.pipe .p .deny { margin-top: 10px; font: 11.5px var(--mono); color: var(--bad); }
+.pipe .p .deny::before { content: "→ 403  "; color: var(--ink3); }
+.trace { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .trace { grid-template-columns: 1fr; } }
+.trace .t { background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 12.5px/1.65 var(--mono); color: var(--ink2); white-space: pre-wrap; word-break: break-word; }
+.trace .t b { color: var(--ink); font-weight: 600; }
+.trace .t .ok { color: var(--ok); } .trace .t .bad { color: var(--bad); } .trace .t .dim { color: var(--ink3); } .trace .t .key { color: var(--info); }
+.trace .t .hd { display: block; font: 600 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--ink3); margin-bottom: 6px; }
+
+/* ── can / cannot ── */
+.cc { width: 100%; border-collapse: collapse; font-size: 14.5px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.cc th, .cc td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.cc th { font-size: 12.5px; color: var(--ink2); font-weight: 600; background: var(--surface2); }
+.cc tr:last-child td { border-bottom: 0; }
+.cc td:first-child { font-weight: 600; width: 34%; }
+.cc .v { font: 600 12px var(--mono); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.cc .v.no { background: var(--bad-soft); color: var(--bad); } .cc .v.yes { background: var(--ok-soft); color: var(--ok); }
+.cc td .how { display: block; color: var(--ink2); font-size: 13.5px; margin-top: 4px; }
+.cc td .probe { font: 11.5px var(--mono); color: var(--ink3); }
+
+/* ── fail closed ── */
+.ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ladder li { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.ladder li i { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--ok-soft); color: var(--ok); font: 700 13px var(--mono); font-style: normal; }
+.ladder li.stop i { background: var(--bad-soft); color: var(--bad); }
+.ladder li b { display: block; font-size: 14.5px; } .ladder li span { font-size: 13.5px; color: var(--ink2); }
+
+/* ── proof ── */
+.term pre { min-height: 0; font-size: 12.5px; }
+.term .pass { color: #4ee08a; } .term .hdr { color: #8b97ab; } .term .lock { color: #7cc4ff; }
+.measured { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; color: var(--ink3); margin-top: 12px; }
+.measured .pill { font-size: 11.5px; }
+.fact .v small { font-size: 15px; font-weight: 600; color: var(--ink2); margin-left: 4px; }
+
+/* ── policy ── */
+.pol { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .pol { grid-template-columns: 1fr; } }
+.pol .code pre { font-size: 12.5px; }
+.pol .code .c { color: var(--ink3); } .pol .code .k { color: var(--accent); } .pol .code .s { color: var(--ok); }
+.pol ul { margin: 0; padding-left: 18px; color: var(--ink2); font-size: 14.5px; } .pol li { margin: 6px 0; } .pol li b { color: var(--ink); }
+
+/* ── limits ── */
+.limits .card { border-left: 3px solid var(--warn); }
+.limits .card h3 { font-size: 15px; }
+
+/* ── quick start ── */
+.qs .code pre { font-size: 13px; }
+.qs .code .c { color: var(--ink3); }
+.state { font: 13px var(--mono); color: var(--ink2); margin-top: 10px; }
+
+/* ── family ── */
+.family { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.family a { display: block; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; transition: border-color .15s; }
+.family a:hover { border-color: var(--accent); }
+.family a b { font-family: var(--mono); color: var(--accent); } .family a span { display: block; font-size: 13.5px; color: var(--ink2); margin-top: 4px; }
+
+@media (prefers-reduced-motion: reduce) { .pod .anim { display: none; } .pod .still { display: initial; } }
+.pod .still { display: none; }
+
+/* the key-path strip: its last line is a note, not a refusal */
+#key .ref { color: var(--ink2); } #key .ref b { color: var(--warn); }

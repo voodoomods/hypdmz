@@ -1,0 +1,1 @@
+["FIREWALL_CONFIG=/app/config/firewall.json", "PROXY_CONSOLE_TOKEN_FILE=/app/tokens/console.token", "VAULT_BOOTSTRAP_MODEL_FILE=/run/secrets/hypdmz_llm_api_key", "VAULT_BOOTSTRAP_MODEL_HOST=api.deepinfra.com", "VAULT_DB_PATH=/app/data/vault.db", "VAULT_MASTER_KEY=/app/data/.master.key"]

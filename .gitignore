@@ -8,3 +8,9 @@ records/
 work/
 *.hypgraph
 *.hypgraph.telemetry.jsonl
+
+# generated at deploy by dev/site_record.py and dev/build_site.py
+site/app/
+site/assets/site-data.js
+site/data/site-record.bundle.json
+site/data/page-checked.md

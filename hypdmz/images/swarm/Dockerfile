@@ -4,7 +4,7 @@
 FROM python:3.12-slim
 
 ARG HYPSWARM_VERSION=0.1.0a11
-ARG HYPGRAPH_VERSION=0.7.6
+ARG HYPGRAPH_VERSION=0.7.7
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu curl ca-certificates git \

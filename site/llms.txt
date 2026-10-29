@@ -1,0 +1,37 @@
+# HypDMZ
+
+> HypDMZ runs a HypSwarm (https://hypswarm.com) research swarm inside a Podman pod whose only way out is a proxy that allows the model API and nothing else, holds the API key the swarm never sees, decrypts every HTTPS request to check it, and writes every call into a SHA-256 hash-chained audit log. The record the swarm builds is a HypGraph (https://hypgraph.com) record, served live. Private beta.
+
+## The pod
+
+Three containers in one Podman pod (shared network namespace):
+
+- hypdmz-controller — NET_ADMIN. Applies a UID-scoped iptables/ip6tables egress floor before anything else starts, publishes `LOCKED <fingerprint>` on 127.0.0.1:8009, re-verifies the rule fingerprint every 30 s and re-applies on drift.
+- hypdmz-proxy — UID 1001, the only UID the floor lets dial out. :8080 forward proxy: CONNECT is answered with a leaf certificate minted under the HypDMZ CA, so every HTTPS request is decrypted and checked against firewall.json (host, port, method, path prefix, request-shape gates), scanned for secrets (DLP), given its vaulted credential, forwarded, and logged. :8002 control API (loopback only; the floor keeps the swarm UID off it).
+- hypdmz-swarm — UID 1000, loopback only. hypswarm + hypgraph from PyPI; refuses to start until the gate says LOCKED and until it has checked, with access(2) as its own user, that it cannot write its own code. Mounts the CA certificate only, never the key. Serves the record on :8000.
+
+## The rule
+
+The egress floor is keyed on socket owner UID, not on port. All three containers share one network namespace, so a port allowlist would apply to the swarm too. Only UID 1001 may open upstream connections (DNS and the HTTP ports); every other UID gets loopback only, over IPv4 and IPv6; only root and UID 1001 may reach :8002.
+
+## Fail closed
+
+The controller applies the floor first. The swarm waits for LOCKED (60 s) and refuses to start otherwise. `hypdmz up` ends by running `egress-check` as the swarm user inside the swarm container and stops the swarm if any escape probe succeeds. A missing or malformed firewall.json denies everything. TLS interception unavailable → every CONNECT refused (no opaque tunnels).
+
+## Proof (hypdmz egress-check, run as the swarm user)
+
+Blocked: direct HTTPS by name, by IP, plain HTTP by IP, IPv6, DNS to a public resolver, DNS via the pod's resolver, the proxy's control API, an unlisted host through the proxy, a relay to the control API through the proxy, reading the CA private key, writing its own code. Reachable (controls): the lockdown gate, the record UI, the proxy, the model host through the proxy. 15 of 15 on 2026-10-29.
+
+First swarm (2026-10-29, examples/first-swarm with --python): settled in 92 s; 2/2 questions, both claims checked; the instrument re-ran every registered computation; 31 model calls, each with the vaulted credential injected by the proxy; 0 DLP findings; audit chain verified (46 events).
+
+## Known limits
+
+- The model key passes to the proxy through `podman run --env` on the first `up`; a podman secret is the next step.
+- On Windows/macOS the state dir is a 9p/virtiofs mount where file ownership is not enforced; key isolation rests on the swarm mounting certs/public/ only, which egress-check verifies.
+- One proxy identity: every run shares the same egress rules and key.
+
+## Commands
+
+hypdmz doctor · build · up · down · status · logs · debug · egress-check · run <folder> [--python --profile --budget-usd --budget-calls --pricing --record]
+
+Policy: proxy/config/firewall.json (hot-reloaded, fail-closed). State: %USERPROFILE%\.hypdmz (Windows), ~/.local/state/hypdmz (Linux), ~/Library/Application Support/HypDMZ (macOS).

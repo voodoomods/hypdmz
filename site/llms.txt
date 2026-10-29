@@ -26,7 +26,8 @@ First swarm (2026-10-29, examples/first-swarm with --python): settled in 92 s; 2
 
 ## Known limits
 
-- The model key passes to the proxy through `podman run --env` on the first `up`; a podman secret is the next step.
+- The model key's first mile is a podman secret (`podman secret create hypdmz_llm_api_key -`), mounted into the proxy container alone as a 0400 file for the proxy UID and read once into the vault; in no container's environment, not in `podman inspect`. The `.env` fallback (MODEL_API_KEY) passes through `--env`; the launcher prefers the secret.
+- The record UI (:8000) and the control API (:8002) answer to anything on the host's loopback.
 - On Windows/macOS the state dir is a 9p/virtiofs mount where file ownership is not enforced; key isolation rests on the swarm mounting certs/public/ only, which egress-check verifies.
 - One proxy identity: every run shares the same egress rules and key.
 

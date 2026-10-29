@@ -96,3 +96,6 @@
 
 @media (prefers-reduced-motion: reduce) { .pod .anim { display: none; } .pod .still { display: initial; } }
 .pod .still { display: none; }
+
+/* the key-path strip: its last line is a note, not a refusal */
+#key .ref { color: var(--ink2); } #key .ref b { color: var(--warn); }

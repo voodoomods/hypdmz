@@ -10,6 +10,8 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://hypdmz.com/">
 <meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="assets/hypdmz.svg" type="image/svg+xml">
 <link rel="alternate" type="text/plain" href="llms.txt" title="For language models">
 <link rel="stylesheet" href="assets/site.css">
@@ -22,7 +24,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="nav"><div class="wrap">
   <a class="brand" href="./"><img src="assets/hypdmz.svg" alt=""><span>Hyp<b>DMZ</b></span></a>
-  <nav aria-label="Site"><a href="#how">How it works</a><a href="#floor">The floor</a><a href="#proof">Proof</a>
+  <nav aria-label="Site" id="sitenav"><a href="#how">How it works</a><a href="#floor">The floor</a><a href="#proof">Proof</a>
     <a href="#policy" class="hide-sm">Policy</a><a href="#start" class="hide-sm">Quick start</a>
     <a href="https://hypswarm.com" class="hide-sm">HypSwarm</a><a href="https://hypgraph.com" class="hide-sm">HypGraph</a>
     <button class="iconbtn" data-toggle-theme type="button" aria-label="Toggle light and dark">◐</button></nav>
@@ -131,7 +133,7 @@
     <div class="p"><h3>TLS interception</h3><p>A leaf cert for the host, signed by the pod's own CA. The key never leaves the proxy.</p><div class="deny">no CA → no tunnel</div></div>
     <div class="p"><h3>Firewall rule</h3><p>Method, path prefix, port, time box, request shape: URL length, query size, no opaque base64 runs, no secrets in the URL.</p><div class="deny">gate:… / rule:…</div></div>
     <div class="p"><h3>DLP</h3><p>Body, <code>Authorization</code> and <code>Cookie</code> scanned for API keys, tokens, private keys. Block or log.</p><div class="deny">dlp:openai_key</div></div>
-    <div class="p"><h3>Credential</h3><p>The rule names a vault entry; the proxy decrypts it, checks its host scope, and sets the header. The placeholder is stripped.</p></div>
+    <div class="p"><h3>Credential</h3><p>The rule names a vault entry; the proxy decrypts it, checks its host scope, and sets the header. The swarm's placeholder is stripped.</p><div class="deny" style="color:var(--ok)">no entry → sent without a key</div></div>
     <div class="p"><h3>Forward, stream, log</h3><p>Streamed upstream and back; retried only before the first byte reaches the client. Inbound DLP on the response. One line in the chain.</p></div>
   </div>
   <div class="trace">
@@ -147,6 +149,16 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
 <b>CONNECT</b> 127.0.0.1:8002 via the proxy  <span class="bad">403 default-deny</span>
 <span class="dim">curl --noproxy '*' https://1.1.1.1</span>       <span class="bad">000 · the kernel dropped it</span>
 <span class="dim">each one is a line in the chain too</span></div>
+  </div>
+  <div class="wf" id="key"><div class="wfh"><i></i>the key's path <span>· from your terminal to one header, never through an environment</span></div>
+    <ol class="flow">
+      <li><b>podman secret</b><span><code>podman secret create hypdmz_llm_api_key -</code> on the host; the launcher looks for it by name</span></li>
+      <li><b>/run/secrets/…</b><span>mounted into the proxy container alone, mode 0400, owned by the proxy UID; not in <code>podman inspect</code></span></li>
+      <li><b>vault</b><span>read once at first start, stored AES-256-GCM, master key in the proxy's data dir; the file is never read again</span></li>
+      <li><b>one header</b><span>set per allowed call, after the rule and the host scope agree; the swarm's placeholder is stripped first</span></li>
+      <li><b>audit</b><span><code>injected: ["model_api_key"]</code> on each line: the name, never the value</span></li>
+    </ol>
+    <div class="ref"><b>still possible:</b> <code>MODEL_API_KEY</code> in <code>.env</code> as a fallback — it passes through <code>--env</code>; the launcher tells you so and prefers the secret.</div>
   </div>
 </div></section>
 
@@ -179,7 +191,7 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
     <thead><tr><th>The swarm…</th><th></th><th>Why, and how it is checked</th></tr></thead>
     <tbody>
       <tr><td>reaches the model API</td><td><span class="v yes">yes</span></td><td>through the proxy, <code>MODEL_BASE_URL</code>'s host only, inference paths only.<span class="how">Probe <span class="probe">proxy-upstream</span>: <code>GET /v1/openai/models</code> through the proxy answers.</span></td></tr>
-      <tr><td>sees the API key</td><td><span class="v no">no</span></td><td>it sends a placeholder; the vault (AES-256-GCM, master key in the proxy's data dir) adds the real one, scoped to the model host.<span class="how">Checked in the audit: every allowed call carries <code>injected: ["model_api_key"]</code>; the swarm's environment holds <code>__hypdmz_inject__</code>.</span></td></tr>
+      <tr><td>sees the API key</td><td><span class="v no">no</span></td><td>it sends a placeholder; the vault (AES-256-GCM, master key in the proxy's data dir) adds the real one, scoped to the model host. The key arrives as a <a href="#key">podman secret</a> mounted into the proxy alone.<span class="how">Checked in the audit: every allowed call carries <code>injected: ["model_api_key"]</code>; the swarm's environment holds <code>__hypdmz_inject__</code>; the proxy's environment holds a path, not a key.</span></td></tr>
       <tr><td>reaches any other host — by name, by IP, over IPv6</td><td><span class="v no">no</span></td><td>owner-UID match in the kernel; the proxy's allowlist is the second wall.<span class="how">Probes <span class="probe">direct-https-by-name · direct-https-by-ip · direct-http-by-ip · direct-ipv6 · proxy-denies-unlisted</span></span></td></tr>
       <tr><td>resolves names</td><td><span class="v no">no</span></td><td>DNS is an exfiltration channel; only the proxy UID may use port 53.<span class="how">Probes <span class="probe">direct-dns-public · pod-resolver-dns</span></span></td></tr>
       <tr><td>reaches the proxy's control API</td><td><span class="v no">no</span></td><td><code>:8002</code> is open to root and the proxy UID only; relaying through the proxy hits default-deny.<span class="how">Probes <span class="probe">proxy-control-api · proxy-relay-to-console</span></span></td></tr>
@@ -286,14 +298,14 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <div class="kicker">Honest limits</div>
   <h2 class="h">Where the guarantee ends today.</h2>
   <div class="grid3 limits">
-    <div class="card"><h3>The key's first mile</h3><p>On the first <code>hypdmz up</code> the model key reaches the proxy through
-      <code>podman run --env</code> and is visible in <code>podman inspect</code> until the <code>.env</code> line is removed and the pod
-      restarted. A podman secret is the next step.</p></div>
+    <div class="card"><h3>What the host can see</h3><p>The record UI on <code>:8000</code> and the control API on <code>:8002</code>
+      answer to anything on the host's loopback: the pod guards the swarm, not your laptop. And the <code>.env</code>
+      fallback for the key, if you use it instead of the secret, passes through <code>--env</code>.</p></div>
     <div class="card"><h3>File ownership on Windows and macOS</h3><p>The state directory is a 9p / virtiofs mount, where modes
       and owners are not enforced. The swarm cannot read the CA key because it mounts a different directory, which
       <code>egress-check</code> verifies, not because of a file mode.</p></div>
     <div class="card"><h3>One egress identity</h3><p>Every run shares the same rules and the same key. Per-run keys would need
-      per-run vault scopes. The record UI on <code>:8000</code> is read-only but readable by anyone on the host's loopback.</p></div>
+      per-run vault scopes, and in the proxy's log one run is told from another only by time.</p></div>
   </div>
 </div></section>
 
@@ -346,6 +358,24 @@ hypdmz egress-check --json       <span class="c"># any time; exit 1 on a single 
       navigator.clipboard.writeText(text).then(function () { b.textContent = 'copied'; setTimeout(function () { b.textContent = 'copy'; }, 1200); });
     });
   });
+  // the nav follows the section in view
+  var links = Array.prototype.slice.call(document.querySelectorAll('#sitenav a[href^="#"]'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+  var order = ['how', 'floor', 'can', 'proof', 'policy', 'record', 'limits', 'start'];
+  var owner = { can: 'floor', record: 'policy', limits: 'policy' };
+  if ('IntersectionObserver' in window) {
+    var visible = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+      var current = '';
+      for (var i = 0; i < order.length; i++) if (visible[order[i]]) { current = order[i]; break; }
+      links.forEach(function (a) { a.removeAttribute('aria-current'); });
+      var a = byId[current] || byId[owner[current]];
+      if (a) a.setAttribute('aria-current', 'page');
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    order.forEach(function (id) { var el = document.getElementById(id); if (el) io.observe(el); });
+  }
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     document.querySelectorAll('.pod svg').forEach(function (s) { if (s.pauseAnimations) s.pauseAnimations(); });
   }

@@ -1,0 +1,5 @@
+# Everything is LF: shell entrypoints and Dockerfiles go into Linux images, and a CRLF shebang is "No such file".
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.woff2 binary

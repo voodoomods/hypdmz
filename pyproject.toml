@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hypdmz"
+version = "0.1.0"
+description = "Run a HypSwarm research swarm inside a governed-egress pod: UID-scoped egress floor, allowlisting TLS-intercepting proxy, vaulted credentials, hash-chained audit."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+hypdmz = "hypdmz.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["hypdmz*"]

@@ -1,0 +1,35 @@
+{
+  "default_policy": "deny",
+  "cidr_blocklist": [
+    {
+      "name": "metadata-services",
+      "enabled": true,
+      "cidrs": ["169.254.169.254/32", "169.254.170.2/32"],
+      "description": "Cloud metadata endpoints (AWS IMDS, ECS metadata) are never reachable"
+    }
+  ],
+  "rules": [
+    {
+      "name": "model-api-deepinfra",
+      "enabled": true,
+      "scheme": "https",
+      "host": "api.deepinfra.com",
+      "ports": [443],
+      "methods": ["GET", "POST"],
+      "path_prefixes": ["/v1/openai/"],
+      "injects": ["model_api_key"],
+      "description": "OpenAI-compatible inference only. Account, billing and GPU-instance paths stay closed; the vault adds the key when MODEL_BASE_URL names this host."
+    },
+    {
+      "name": "model-api-openai",
+      "enabled": true,
+      "scheme": "https",
+      "host": "api.openai.com",
+      "ports": [443],
+      "methods": ["GET", "POST"],
+      "path_prefixes": ["/v1/chat/completions", "/v1/responses", "/v1/models", "/v1/embeddings"],
+      "injects": ["model_api_key"],
+      "description": "Inference endpoints only; the vault adds the key when MODEL_BASE_URL names this host."
+    }
+  ]
+}

@@ -37,7 +37,7 @@
 <section class="hero"><div class="wrap">
   <div class="hero-grid">
     <div>
-      <div class="hero-tags"><span class="pill accent">private beta</span><span class="pill">runs HypSwarm</span>
+      <div class="hero-tags"><span class="pill accent">alpha · <code>pip install --pre hypdmz</code></span><span class="pill">runs HypSwarm</span>
         <span class="pill">Podman · Windows / Linux / macOS</span><span class="pill">host needs Python <code>3.9+</code>, nothing else</span></div>
       <h1>The swarm can reach one host. <span data-ok="the egress check runs from the swarm's own seat on every start, and this page's figures are claims in a record of their own (#evidence)">You can prove it.</span></h1>
       <p class="lede">HypDMZ runs a <a href="https://hypswarm.com">HypSwarm</a> research swarm inside a pod whose only way
@@ -251,7 +251,7 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
 <span class="pass">[hypdmz] egress floor verified: the swarm cannot bypass the proxy.</span></pre></div>
 
   <h2 class="h" style="margin-top:56px">The first swarm, measured.</h2>
-  <p class="sub"><code>hypdmz run examples/first-swarm --python</code>: two seats, a t-test on a CSV, every computation run by
+  <p class="sub"><code>hypdmz run first-swarm --python</code>: two seats, a t-test on a CSV, every computation run by
     the swarm's own Python tool inside the locked container and re-run by the record's instrument before review.</p>
   <div class="grid4">
     <div class="card fact"><div class="k">Probes</div><div class="v" data-fact="probes"></div><div class="s" data-fact="probes-s"></div><div class="src" data-claim="probes"></div></div>
@@ -348,19 +348,23 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
 
 <section class="block qs" id="start"><div class="wrap">
   <div class="kicker">Quick start</div>
-  <h2 class="h">Six commands from nothing to a verified swarm.</h2>
+  <h2 class="h">From <code>pip install</code> to a verified swarm.</h2>
   <p class="sub">Podman on the host (Podman Desktop on Windows and macOS, <code>podman</code> on Linux) and <span data-ok="design constant: pyproject requires-python >= 3.9">Python 3.9</span> for the
-    launcher, which has no dependencies. The images bring everything else.</p>
+    launcher, which has no dependencies. The three image build contexts, the default policy and an example ride
+    inside the package; nothing is read from a repository checkout.</p>
   <div class="code"><button class="copy" type="button" data-copy>copy</button>
-<pre>pip install -e .                 <span class="c"># the launcher; or run it as python -m hypdmz</span>
-hypdmz doctor                    <span class="c"># prints the state dir; copy .env.example there, set MODEL_API_KEY</span>
-hypdmz build                     <span class="c"># three images: controller, proxy, swarm</span>
-hypdmz up                        <span class="c"># creates the CA, starts the pod, vaults the key, verifies the floor</span>
-hypdmz run examples/first-swarm --python --budget-usd 0.20
-hypdmz egress-check --json       <span class="c"># any time; exit 1 on a single bypass</span></pre></div>
-  <p class="state">record UI → http://127.0.0.1:8000 · control API → http://127.0.0.1:8002 · proxy for host tools → http://127.0.0.1:8080</p>
-  <p class="note">Private beta. HypDMZ runs our own research today; the repository opens when the key's first mile is a
-    secret and the floor has been verified on Linux and macOS hosts as well as Windows.</p>
+<pre>pip install --pre hypdmz              <span class="c"># the launcher: stdlib only, the pod's build contexts inside</span>
+hypdmz init                           <span class="c"># the state dir and its .env; prints what comes next</span>
+podman secret create hypdmz_llm_api_key -   <span class="c"># paste the model API key; it reaches the proxy only</span>
+hypdmz doctor
+hypdmz build                          <span class="c"># three images: controller, proxy, swarm</span>
+hypdmz up                             <span class="c"># creates the CA, starts the pod, vaults the key, verifies the floor</span>
+hypdmz run first-swarm --python --budget-usd 0.20
+hypdmz egress-check --json            <span class="c"># any time; exit 1 on a single bypass</span></pre></div>
+  <p class="state">record UI → http://127.0.0.1:8000 · control API → http://127.0.0.1:8002 · proxy for host tools → http://127.0.0.1:8080 ·
+    the allowlist → <code>hypdmz policy</code> · your own task → <code>hypdmz example first-swarm ./mine</code>, edit, <code>hypdmz run ./mine</code></p>
+  <p class="note">Alpha. HypDMZ runs our own research today. The package is on PyPI; the repository opens once the floor
+    has been verified on Linux and macOS hosts as well as Windows.</p>
 </div></section>
 
 <section class="block" id="family"><div class="wrap">

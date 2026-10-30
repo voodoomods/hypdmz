@@ -172,6 +172,8 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
           f"  proxy      → http://127.0.0.1:{cfg.proxy_port}  (host tools: trust {cfg.ca_cert_path})")
     if cfg.model_api_key and not secret:
         print(f"[hypdmz] MODEL_API_KEY was handed to the vault — remove it from {cfg.env_file} now.")
+    print("[hypdmz] HypDMZ reduces what the swarm can reach; it does not make untrusted code safe. Alpha, not "
+          "independently audited — https://hypdmz.com/#disclaimer")
     if skip_egress_check:
         print("[hypdmz] egress check skipped (--skip-egress-check).")
         return 0

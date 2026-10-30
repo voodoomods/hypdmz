@@ -103,6 +103,13 @@ The proxy is published on `127.0.0.1:8080` (`HYPDMZ_PROXY_PORT`). Host tools get
 HTTPS_PROXY=http://127.0.0.1:8080  SSL_CERT_FILE=<state dir>/certs/public/hypdmz-ca-cert.pem  OPENAI_API_KEY=__hypdmz_inject__
 ```
 
+## Disclaimer
+
+Provided as is, without warranty, under the [Apache License 2.0](https://github.com/voodoomods/hypdmz/blob/main/LICENSE).
+HypDMZ reduces what an agent can reach; it does not make running untrusted code safe. A passing egress check shows
+that its probes were blocked, not that no bypass exists. Alpha, and not independently audited. The full text:
+[DISCLAIMER.md](https://github.com/voodoomods/hypdmz/blob/main/DISCLAIMER.md).
+
 ## Status
 
 Alpha, private beta. Verified on Windows 11 (Podman Desktop, WSL2); the Linux and macOS paths are written and

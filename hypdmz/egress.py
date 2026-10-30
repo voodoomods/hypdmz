@@ -242,7 +242,8 @@ def print_report(report: EgressReport) -> None:
         print(f"  [{glyph}] {r.name:24s} expect {expect:9s} got {r.observed:5s}  {r.description}")
     print()
     if report.ok:
-        print("[hypdmz] egress floor verified: the swarm cannot bypass the proxy.")
+        print("[hypdmz] egress floor verified: every bypass this check tries was blocked.")
+        print("         A route the check does not try is not tested — https://hypdmz.com/#disclaimer")
     elif report.bypass_found:
         print("[hypdmz] EGRESS BYPASS: the swarm can reach the network without the proxy.")
     else:

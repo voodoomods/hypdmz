@@ -1,0 +1,6 @@
+HypDMZ
+Copyright 2026 VoodooMods LLC
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+The container images it builds install third-party software under that software's own licences; see each image's
+Dockerfile and requirements.

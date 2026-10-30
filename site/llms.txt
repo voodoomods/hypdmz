@@ -41,3 +41,5 @@ pip install --pre hypdmz
 hypdmz init · doctor · build · up · down · status · logs · debug · egress-check · run <folder | bundled example> [--python --profile --budget-usd --budget-calls --pricing --record] · policy show|path|reset · example [name [dest]]
 
 Policy: <state dir>/policy/firewall.json, seeded from the package's default on the first `up` (hot-reloaded, fail-closed). State: %USERPROFILE%\.hypdmz (Windows), ~/.local/state/hypdmz (Linux), ~/Library/Application Support/HypDMZ (macOS).
+
+Disclaimer (https://hypdmz.com/#disclaimer): provided as is, without warranty, under Apache-2.0. HypDMZ reduces what an agent can reach; it does not make untrusted code safe. A passing egress check shows its probes were blocked, not that no bypass exists. Alpha, not independently audited.

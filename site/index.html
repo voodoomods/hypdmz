@@ -248,7 +248,7 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <span class="pass">[PASS]</span> console-requires-token   expect blocked   got 401    Control API without the bearer token (from the host)
   <span class="pass">[PASS]</span> console-with-token       expect reachable got 200    Control API with the token from console.token
 
-<span class="pass">[hypdmz] egress floor verified: the swarm cannot bypass the proxy.</span></pre></div>
+<span class="pass">[hypdmz] egress floor verified: every bypass this check tries was blocked.</span></pre></div>
 
   <h2 class="h" style="margin-top:56px">The first swarm, measured.</h2>
   <p class="sub"><code>hypdmz run first-swarm --python</code>: two seats, a t-test on a CSV, every computation run by
@@ -346,6 +346,23 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   </div>
 </div></section>
 
+<section class="block" id="disclaimer"><div class="wrap">
+  <div class="kicker">Disclaimer</div>
+  <h2 class="h">Provided as is.</h2>
+  <div class="prose disclaimer">
+    <p>HypDMZ is provided as is, without warranty of any kind, under the <a href="https://github.com/voodoomods/hypdmz/blob/main/LICENSE">Apache License 2.0</a>.
+      It reduces what an agent can reach; it does not make running untrusted code safe. Each layer on this page can be
+      misconfigured or have a flaw nobody has found yet, and a container shares the host's kernel.</p>
+    <p>A passing egress check shows that its probes were blocked, not that no bypass exists. The protections here were
+      checked on the configurations this page names; others are unverified. HypDMZ is alpha software and has not had an
+      independent security audit.</p>
+    <p>Your keys, your policy, what your agents do with the access you give them, and your compliance with your model
+      provider's terms remain yours to answer for. HypDMZ is not affiliated with the Podman project, Red Hat, OpenAI or
+      any model provider. The full text: <a href="https://github.com/voodoomods/hypdmz/blob/main/DISCLAIMER.md">DISCLAIMER.md</a>.
+      Made by VoodooMods LLC.</p>
+  </div>
+</div></section>
+
 <section class="block qs" id="start"><div class="wrap">
   <div class="kicker">Quick start</div>
   <h2 class="h">From <code>pip install</code> to a verified swarm.</h2>
@@ -379,7 +396,7 @@ hypdmz egress-check --json            <span class="c"># any time; exit 1 on a si
 
 <footer><div class="wrap">
   <span class="slogan">hypdmz · fail closed · keyed on who sends · nothing unlogged</span>
-  <span><a href="https://hypgraph.com">HypGraph</a> · <a href="https://hypswarm.com">HypSwarm</a> · <a href="llms.txt">llms.txt</a></span>
+  <span><a href="#disclaimer">Disclaimer</a> · <a href="https://hypgraph.com">HypGraph</a> · <a href="https://hypswarm.com">HypSwarm</a> · <a href="llms.txt">llms.txt</a></span>
 </div></footer>
 
 <script>

@@ -208,7 +208,7 @@ body.apppage { height: 100vh; height: 100dvh; display: flex; flex-direction: col
 .phead { padding: 56px 0 28px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .phead h1 { font-size: clamp(30px, 4.4vw, 46px); letter-spacing: -.03em; line-height: 1.08; margin: 6px 0 10px; font-weight: 720; }
 .phead p { color: var(--ink2); font-size: 18px; max-width: 780px; margin: 0; }
-.doc { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px; padding: 36px 0 80px; }
+.doc { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px; padding-top: 36px; padding-bottom: 80px; }
 @media (max-width: 900px) { .doc { grid-template-columns: 1fr; gap: 0; } .toc { display: none; } }
 .toc { position: sticky; top: 76px; align-self: start; font-size: 14px; }
 .toc a { display: block; color: var(--ink2); text-decoration: none; padding: 4px 0 4px 10px; border-left: 2px solid var(--line); }

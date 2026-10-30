@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0a3 — 2026-10-30
+
+- **Licensed.** 0.1.0a1 and 0.1.0a2 went to PyPI without a licence file or field, so they carried no licence grant
+  and no warranty disclaimer. This release ships `LICENSE` (Apache-2.0, like HypGraph, HypSwarm and HypMesh) and
+  `NOTICE` (VoodooMods LLC), and the wheel declares `License-Expression: Apache-2.0`.
+- **A disclaimer** (`DISCLAIMER.md`, a section on hypdmz.com and its own page at hypdmz.com/disclaimer/): provided as
+  is; HypDMZ reduces what an agent can reach and does not make running untrusted code safe; a passing egress check
+  shows its probes were blocked, not that no bypass exists; tested where the site says, unverified elsewhere; alpha,
+  not independently audited.
+- **`egress-check` says what it showed.** Its success line read "the swarm cannot bypass the proxy". It now says
+  every bypass the check tries was blocked, and that a route it does not try is not tested. `hypdmz up` ends with
+  one line on what the pod does and does not promise.
+
 ## 0.1.0a2 — 2026-10-29
 
 - **The record UI answers browsers.** The swarm image now pins hypgraph 0.7.7, whose `serve` bound to `0.0.0.0`

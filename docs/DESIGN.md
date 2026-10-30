@@ -78,6 +78,19 @@ Three things a hostile or runaway swarm process could still have done, each now 
   IPC, which would put the swarm and the proxy in one SysV shared-memory and message-queue space; nothing used it,
   and now it isn't there. Probe `ipc-namespace-shared` compares the two containers' `/proc/self/ns/ipc` from the
   host. The pod never shared the PID namespace, so the swarm sees only its own processes.
+- **Take over the proxy, which holds the key.** The proxy container runs with the swarm's hardening: `--cap-drop ALL`
+  plus only SETUID, SETGID (the entrypoint drops from root to the proxy UID), SETPCAP (it then empties the bounding
+  set, so the dropped process can never regain even those) and CHOWN (it hands `/app/data` to that UID on Linux);
+  `--security-opt no-new-privileges`; a read-only root with `/tmp` as the only scratch space, since everything it
+  writes (`/app/data`: vault, audit chain, leaf-cert cache) is a mount. Probes `proxy-not-root`, `proxy-no-capabilities`,
+  `proxy-no-new-privileges` and `proxy-rootfs-readonly` read `/proc/1/status` and `/proc/mounts` inside the proxy from
+  the host.
+- **Swap what the images are built from.** The three `FROM` lines pin the base image by the digest of its multi-arch
+  index (`python:3.12-slim@sha256:…`, `alpine:3.19@sha256:…`), so a rebuilt tag can't change what runs here. The proxy's
+  Python packages are pinned to exact versions with the sha256 of every published file (`pip-compile
+  --generate-hashes`; `pip install --require-hashes` refuses anything else). Updating is deliberate: pull the tag,
+  read its index digest from `podman image inspect`, and re-run pip-compile. The swarm image still installs
+  `hypswarm` and `hypgraph` by version only (their dependency trees are unpinned); that is the next step.
 - **Find something under `/run/secrets`.** Podman can add default mounts there (on Fedora-based podman machines,
   Red Hat subscription files: public CA certificates and a config file). The swarm is given no secrets, so it gets
   an empty read-only tmpfs at `/run/secrets` instead; the proxy keeps its own, where the model key's podman secret

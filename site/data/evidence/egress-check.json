@@ -1,7 +1,7 @@
 {
   "ok": true,
   "bypass_found": false,
-  "lockdown_state": "LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-30T16:30:31Z checked_at=2026-10-30T16:30:31Z denied_v4=0 denied_v6=0",
+  "lockdown_state": "LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-30T16:48:17Z checked_at=2026-10-30T16:48:48Z denied_v4=15 denied_v6=9",
   "caps": {
     "calls_per_hour": 1200,
     "megabytes_per_hour": 300.0,
@@ -172,6 +172,34 @@
       "passed": true,
       "observed": "separate",
       "description": "The swarm and the proxy in one IPC namespace (from the host)"
+    },
+    {
+      "name": "proxy-not-root",
+      "kind": "control",
+      "passed": true,
+      "observed": "1001",
+      "description": "The proxy's main process runs as UID 1001, not root (from the host)"
+    },
+    {
+      "name": "proxy-no-capabilities",
+      "kind": "control",
+      "passed": true,
+      "observed": "0000000000000000",
+      "description": "The proxy's process holds no capabilities (CapEff is zero)"
+    },
+    {
+      "name": "proxy-no-new-privileges",
+      "kind": "control",
+      "passed": true,
+      "observed": "1",
+      "description": "The proxy's process cannot gain privileges (NoNewPrivs)"
+    },
+    {
+      "name": "proxy-rootfs-readonly",
+      "kind": "control",
+      "passed": true,
+      "observed": "ro",
+      "description": "The proxy container's root filesystem is mounted read-only"
     }
   ]
 }

@@ -117,7 +117,8 @@ class EgressReport:
 
     @property
     def bypass_found(self) -> bool:
-        return any(not r.passed for r in self.results if r.kind == "blocked")
+        # a probe that never reported ("missing") fails the check but proves no bypass
+        return any(not r.passed and r.observed != "missing" for r in self.results if r.kind == "blocked")
 
 
 def lockdown_state() -> str:
@@ -176,6 +177,7 @@ def run_check(cfg: Config, *, wait_for_lock_s: int = 20) -> EgressReport:
                            observed.get(p.name, "missing"), p.description) for p in ps]
     results += console_checks(cfg)
     results += namespace_checks()
+    results += proxy_checks()
     return EgressReport(state, results, caps=console_caps(cfg))
 
 
@@ -201,9 +203,9 @@ def console_checks(cfg: Config) -> list[ProbeResult]:
     without = _console_get(cfg, "/api/status", None)
     with_tok = _console_get(cfg, "/api/status", tok) if tok else 0
     return [
-        ProbeResult("console-requires-token", "blocked", without == 401, str(without),
+        ProbeResult("console-requires-token", "blocked", without == 401, "missing" if without == 0 else str(without),
                     "Control API without the bearer token (from the host)"),
-        ProbeResult("console-with-token", "control", with_tok == 200, str(with_tok),
+        ProbeResult("console-with-token", "control", with_tok == 200, "missing" if with_tok == 0 else str(with_tok),
                     f"Control API with the token from {cfg.console_token_path.name}"),
     ]
 
@@ -221,6 +223,29 @@ def namespace_checks() -> list[ProbeResult]:
     observed = "shared" if shared else ("separate" if swarm and proxy else "missing")
     return [ProbeResult("ipc-namespace-shared", "blocked", observed == "separate", observed,
                         "The swarm and the proxy in one IPC namespace (from the host)")]
+
+
+PROXY_UID = 1001
+
+
+def proxy_checks() -> list[ProbeResult]:
+    """Run from the host, read inside the proxy: its main process must run as the proxy UID with no capabilities
+    and no way to gain any, on a read-only root filesystem. The proxy holds the key; this is its blast radius."""
+    script = ("awk '/^Uid:/{print \"uid|\"$2} /^CapEff:/{print \"caps|\"$2} /^NoNewPrivs:/{print \"nnp|\"$2}' /proc/1/status; "
+              "awk '$2 == \"/\" && $4 ~ /(^|,)ro(,|$)/ { f = 1 } END { print \"rootfs|\" (f ? \"ro\" : \"rw\") }' /proc/mounts")
+    rc, out, _ = run_capture(["podman", "exec", "hypdmz-proxy", "sh", "-c", script])
+    seen = dict(line.split("|", 1) for line in out.splitlines() if "|" in line) if rc == 0 else {}
+    uid, caps, nnp, rootfs = seen.get("uid", ""), seen.get("caps", ""), seen.get("nnp", ""), seen.get("rootfs", "")
+    return [
+        ProbeResult("proxy-not-root", "control", uid == str(PROXY_UID), uid or "missing",
+                    f"The proxy's main process runs as UID {PROXY_UID}, not root (from the host)"),
+        ProbeResult("proxy-no-capabilities", "control", bool(caps) and set(caps) == {"0"}, caps or "missing",
+                    "The proxy's process holds no capabilities (CapEff is zero)"),
+        ProbeResult("proxy-no-new-privileges", "control", nnp == "1", nnp or "missing",
+                    "The proxy's process cannot gain privileges (NoNewPrivs)"),
+        ProbeResult("proxy-rootfs-readonly", "control", rootfs == "ro", rootfs or "missing",
+                    "The proxy container's root filesystem is mounted read-only"),
+    ]
 
 
 def console_caps(cfg: Config) -> dict:
@@ -254,7 +279,7 @@ def print_report(report: EgressReport) -> None:
     if report.error:
         print(f"[ERROR] could not run probes: {report.error}")
         return
-    print("── probes (run as the swarm user; the console and IPC namespace probes from the host) ──")
+    print("── probes (run as the swarm user; the console, IPC namespace and proxy-process probes from the host) ──")
     for r in report.results:
         glyph = "PASS" if r.passed else "FAIL"
         expect = "blocked" if r.kind == "blocked" else "reachable"

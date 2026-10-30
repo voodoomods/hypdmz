@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **The proxy is hardened like the swarm.** `--cap-drop ALL` plus only SETUID, SETGID, SETPCAP and CHOWN (the entrypoint
+  drops to the proxy UID and empties the bounding set), `no-new-privileges`, a read-only root with `/tmp` as the only
+  scratch space. Four `egress-check` probes read the proxy's process from the host: UID 1001, no capabilities,
+  NoNewPrivs, read-only root.
+- **Pinned supply chain.** The three images pin their base by the digest of its multi-arch index, and the proxy's
+  Python packages are pinned to exact versions with the sha256 of every published file (`--require-hashes`). A hash
+  that doesn't match fails the build.
+- **No shared IPC namespace** (`--share net,uts`), and the swarm gets an empty read-only `/run/secrets`, hiding podman's
+  default mounts there. Probes `ipc-namespace-shared` and `run-secrets-empty`.
+- **`egress-check` reads "missing" honestly:** a probe that never reported fails the check but is not called a
+  bypass. 27 probes in all.
+
 ## 0.1.0a3 — 2026-10-30
 
 - **Licensed.** 0.1.0a1 and 0.1.0a2 went to PyPI without a licence file or field, so they carried no licence grant

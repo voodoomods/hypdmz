@@ -115,6 +115,10 @@ def test_up_dry_run_command_lines(state, capsys):
     assert "--cap-add NET_ADMIN --cap-add NET_RAW" in ctl and ctl.endswith("hypdmz-controller:latest")
     proxy = next(ln for ln in out.splitlines() if "--name hypdmz-proxy" in ln)
     assert f"{state / 'policy'}:/app/config:ro" in proxy
+    for flag in ("--cap-drop ALL", "--cap-add SETUID", "--cap-add SETGID", "--cap-add SETPCAP", "--cap-add CHOWN",
+                 "--security-opt no-new-privileges", "--read-only", "--tmpfs /tmp:rw,size=64m,mode=1777"):
+        assert flag in proxy, flag                                            # the proxy holds the key: hardened like the swarm
+    assert "--cap-add NET" not in proxy
     assert "--secret hypdmz_llm_api_key,type=mount,uid=1001,gid=1001,mode=0400" in proxy
     assert "VAULT_BOOTSTRAP_MODEL_FILE=/run/secrets/hypdmz_llm_api_key" in proxy
     assert "VAULT_BOOTSTRAP_MODEL=" not in proxy.replace("VAULT_BOOTSTRAP_MODEL_HOST", "").replace("VAULT_BOOTSTRAP_MODEL_FILE", "")
@@ -162,3 +166,36 @@ def test_ipc_namespace_check_reads_both_containers(monkeypatch):
     assert egress.namespace_checks()[0].passed is False and egress.namespace_checks()[0].observed == "shared"
     ns["hypdmz-proxy"] = ""
     assert egress.namespace_checks()[0].passed is False and egress.namespace_checks()[0].observed == "missing"
+
+
+def test_images_are_pinned_by_digest_and_proxy_packages_by_hash():
+    for name in ("controller", "proxy", "swarm"):
+        df = (env.IMAGES_DIR / name / "Dockerfile").read_text(encoding="utf-8")
+        froms = [ln for ln in df.splitlines() if ln.startswith("FROM ")]
+        assert froms and all("@sha256:" in ln for ln in froms), name
+    df = (env.IMAGES_DIR / "proxy" / "Dockerfile").read_text(encoding="utf-8")
+    assert "--require-hashes" in df
+    req = (env.IMAGES_DIR / "proxy" / "requirements.txt").read_text(encoding="utf-8")
+    pinned = [ln for ln in req.splitlines() if ln and not ln.startswith(("#", " ", "\\")) and "==" in ln]
+    assert len(pinned) >= 20 and "fastapi==" in req and "cryptography==" in req
+    assert req.count("--hash=sha256:") >= len(pinned)                           # at least one hash per pinned package
+
+
+def test_proxy_checks_read_the_process(monkeypatch):
+    from hypdmz import egress
+    good = "uid|1001\ncaps|0000000000000000\nnnp|1\nrootfs|ro\n"
+    monkeypatch.setattr(egress, "run_capture", lambda cmd: (0, good, ""))
+    assert all(r.passed for r in egress.proxy_checks())
+    bad = "uid|0\ncaps|000001ffffffffff\nnnp|0\nrootfs|rw\n"
+    monkeypatch.setattr(egress, "run_capture", lambda cmd: (0, bad, ""))
+    assert [r.passed for r in egress.proxy_checks()] == [False, False, False, False]
+    monkeypatch.setattr(egress, "run_capture", lambda cmd: (1, "", "no such container"))
+    assert not any(r.passed for r in egress.proxy_checks()) and egress.proxy_checks()[0].observed == "missing"
+
+
+def test_a_probe_that_never_ran_is_a_failure_but_not_a_bypass():
+    from hypdmz.egress import EgressReport, ProbeResult
+    r = EgressReport("LOCKED", [ProbeResult("console-requires-token", "blocked", False, "missing", "")])
+    assert not r.ok and not r.bypass_found
+    r = EgressReport("LOCKED", [ProbeResult("direct-https-by-ip", "blocked", False, "200", "")])
+    assert not r.ok and r.bypass_found

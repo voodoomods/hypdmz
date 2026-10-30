@@ -128,6 +128,13 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
         proxy_env["VAULT_BOOTSTRAP_MODEL"] = cfg.model_api_key
     proxy_env["PROXY_CONSOLE_TOKEN_FILE"] = "/app/tokens/console.token"
     _do(["podman", "run", "-d", "--pod", POD_NAME, "--name", PROXY,
+         # The proxy holds the key, so it gets the swarm's hardening too. SETUID/SETGID: the entrypoint drops from
+         # root to the proxy UID (the egress floor is keyed on it). SETPCAP: it then empties the bounding set, so the
+         # dropped process can never regain even these. CHOWN: it hands /app/data to that UID on Linux.
+         # Read-only root; /tmp is the only scratch space. /app/data, the policy, the certs and the tokens are mounts.
+         "--cap-drop", "ALL", "--cap-add", "SETUID", "--cap-add", "SETGID", "--cap-add", "SETPCAP", "--cap-add", "CHOWN",
+         "--security-opt", "no-new-privileges",
+         "--read-only", "--tmpfs", "/tmp:rw,size=64m,mode=1777",
          *_volume(platform, cfg.policy_dir, "/app/config", readonly=True),
          *_volume(platform, cfg.proxy_data_dir, "/app/data"),
          *_volume(platform, cfg.cert_dir, "/etc/hypdmz-certs", readonly=True),

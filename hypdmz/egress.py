@@ -63,6 +63,9 @@ def probes(cfg: Config) -> tuple[Probe, ...]:
         Probe("ca-private-key", "blocked",
               "[ -r /etc/hypdmz-certs/hypdmz-ca.pem ] && echo ok || echo fail",
               "Read the egress CA's private key (only the proxy holds it)"),
+        Probe("run-secrets-empty", "blocked",
+              "[ -n \"$(ls -A /run/secrets 2>/dev/null)\" ] && echo ok || echo fail",
+              "Find anything under /run/secrets (podman's default mounts land there; the swarm is given none)"),
         Probe("swarm-code-write", "blocked",
               "d=\"$(python -c 'import hypswarm,os;print(os.path.dirname(hypswarm.__file__))')\"; "
               "[ -w \"$d/run.py\" ] || [ -w \"$d\" ] || [ -w /entrypoint.sh ] && echo ok || echo fail",
@@ -172,6 +175,7 @@ def run_check(cfg: Config, *, wait_for_lock_s: int = 20) -> EgressReport:
     results = [ProbeResult(p.name, p.kind, _passed(p, observed.get(p.name, "missing")),
                            observed.get(p.name, "missing"), p.description) for p in ps]
     results += console_checks(cfg)
+    results += namespace_checks()
     return EgressReport(state, results, caps=console_caps(cfg))
 
 
@@ -202,6 +206,21 @@ def console_checks(cfg: Config) -> list[ProbeResult]:
         ProbeResult("console-with-token", "control", with_tok == 200, str(with_tok),
                     f"Control API with the token from {cfg.console_token_path.name}"),
     ]
+
+
+def _ns(container: str, kind: str) -> str:
+    rc, out, _ = run_capture(["podman", "exec", container, "readlink", f"/proc/self/ns/{kind}"])
+    return out.strip() if rc == 0 else ""
+
+
+def namespace_checks() -> list[ProbeResult]:
+    """Run from the host: the swarm and the proxy must not share an IPC namespace (SysV shared memory, semaphores and
+    message queues would be a channel between them). They do share the network namespace, on purpose."""
+    swarm, proxy = _ns(SWARM_CONTAINER, "ipc"), _ns("hypdmz-proxy", "ipc")
+    shared = bool(swarm) and swarm == proxy
+    observed = "shared" if shared else ("separate" if swarm and proxy else "missing")
+    return [ProbeResult("ipc-namespace-shared", "blocked", observed == "separate", observed,
+                        "The swarm and the proxy in one IPC namespace (from the host)")]
 
 
 def console_caps(cfg: Config) -> dict:
@@ -235,7 +254,7 @@ def print_report(report: EgressReport) -> None:
     if report.error:
         print(f"[ERROR] could not run probes: {report.error}")
         return
-    print("── probes (run as the swarm user; the two console probes from the host) ──")
+    print("── probes (run as the swarm user; the console and IPC namespace probes from the host) ──")
     for r in report.results:
         glyph = "PASS" if r.passed else "FAIL"
         expect = "blocked" if r.kind == "blocked" else "reachable"

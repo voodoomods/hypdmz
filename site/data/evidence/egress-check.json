@@ -1,7 +1,7 @@
 {
   "ok": true,
   "bypass_found": false,
-  "lockdown_state": "LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-29T15:57:00Z checked_at=2026-10-29T15:57:00Z denied_v4=0 denied_v6=0",
+  "lockdown_state": "LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-30T16:30:31Z checked_at=2026-10-30T16:30:31Z denied_v4=0 denied_v6=0",
   "caps": {
     "calls_per_hour": 1200,
     "megabytes_per_hour": 300.0,
@@ -83,6 +83,13 @@
       "description": "Read the egress CA's private key (only the proxy holds it)"
     },
     {
+      "name": "run-secrets-empty",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "fail",
+      "description": "Find anything under /run/secrets (podman's default mounts land there; the swarm is given none)"
+    },
+    {
       "name": "swarm-code-write",
       "kind": "blocked",
       "passed": true,
@@ -158,6 +165,13 @@
       "passed": true,
       "observed": "200",
       "description": "Control API with the token from console.token"
+    },
+    {
+      "name": "ipc-namespace-shared",
+      "kind": "blocked",
+      "passed": true,
+      "observed": "separate",
+      "description": "The swarm and the proxy in one IPC namespace (from the host)"
     }
   ]
 }

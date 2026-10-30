@@ -94,7 +94,9 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
         _teardown(quiet=True)
     _ensure_ca(cfg, platform, dry_run=dry_run)
 
-    pod_args = ["podman", "pod", "create", "--name", POD_NAME]
+    # share the network (the egress floor works on it) and the hostname, nothing else: podman's default also shares
+    # the IPC namespace, which would let the swarm and the proxy see each other's SysV shared memory and queues
+    pod_args = ["podman", "pod", "create", "--name", POD_NAME, "--share", "net,uts"]
     for host_port, pod_port in cfg.publish_ports:
         pod_args += ["--publish", f"127.0.0.1:{host_port}:{pod_port}"]
     _do(pod_args, dry_run)
@@ -157,6 +159,9 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
          "--read-only",
          "--tmpfs", f"/tmp:rw,size={cfg.swarm_tmp},mode=1777",
          "--tmpfs", "/home/swarm:rw,size=256m,mode=0700",      # the entrypoint chowns it to the swarm user
+         # an empty, read-only /run/secrets: hides podman's default mounts there (on Fedora-based podman machines,
+         # Red Hat subscription files). The swarm is given no secrets; the proxy keeps its own /run/secrets.
+         "--tmpfs", "/run/secrets:ro,size=4k,mode=0555",
          "--memory", cfg.swarm_memory, "--memory-swap", cfg.swarm_memory,
          "--cpus", cfg.swarm_cpus, "--pids-limit", cfg.swarm_pids,
          *_volume(platform, cfg.records_dir, "/records"),

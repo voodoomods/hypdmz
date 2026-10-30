@@ -109,6 +109,8 @@ def test_up_dry_run_command_lines(state, capsys):
     assert main(["up", "--dry-run"]) == 0
     out = capsys.readouterr().out
     assert "--publish 127.0.0.1:8100:8000" in out and "--publish 127.0.0.1:8002:8002" in out
+    pod = next(ln for ln in out.splitlines() if "podman pod create" in ln)
+    assert "--share net,uts" in pod                                       # no shared IPC namespace
     ctl = next(ln for ln in out.splitlines() if "--name hypdmz-controller" in ln)
     assert "--cap-add NET_ADMIN --cap-add NET_RAW" in ctl and ctl.endswith("hypdmz-controller:latest")
     proxy = next(ln for ln in out.splitlines() if "--name hypdmz-proxy" in ln)
@@ -118,7 +120,7 @@ def test_up_dry_run_command_lines(state, capsys):
     assert "VAULT_BOOTSTRAP_MODEL=" not in proxy.replace("VAULT_BOOTSTRAP_MODEL_HOST", "").replace("VAULT_BOOTSTRAP_MODEL_FILE", "")
     swarm = next(ln for ln in out.splitlines() if "--name hypdmz-swarm" in ln)
     for flag in ("--cap-drop ALL", "--cap-add SETUID", "--cap-add SETGID", "--cap-add CHOWN", "--security-opt no-new-privileges",
-                 "--read-only", "--tmpfs /tmp:rw,size=2g,mode=1777", "--memory 2g --memory-swap 2g", "--cpus 2", "--pids-limit 512",
+                 "--read-only", "--tmpfs /tmp:rw,size=2g,mode=1777", "--tmpfs /run/secrets:ro,size=4k,mode=0555", "--memory 2g --memory-swap 2g", "--cpus 2", "--pids-limit 512",
                  "OPENAI_API_KEY=__hypdmz_inject__", "HTTPS_PROXY=http://127.0.0.1:8080", "SSL_CERT_FILE=/tmp/hypdmz-ca-bundle.crt"):
         assert flag in swarm, flag
     assert f"{state / 'certs' / 'public'}:/etc/hypdmz-certs:ro" in swarm     # the certificate only, never the key
@@ -129,7 +131,8 @@ def test_egress_probes_cover_the_claims():
     from hypdmz.egress import probes
     names = {p.name for p in probes(env.Config())}
     for n in ("direct-https-by-name", "direct-https-by-ip", "direct-ipv6", "direct-dns-public", "pod-resolver-dns",
-              "proxy-control-api", "proxy-denies-unlisted", "proxy-relay-to-console", "ca-private-key", "swarm-code-write",
+              "proxy-control-api", "proxy-denies-unlisted", "proxy-relay-to-console", "ca-private-key", "run-secrets-empty",
+              "swarm-code-write",
               "swarm-rootfs-readonly", "swarm-memory-capped", "swarm-pids-capped", "swarm-cpu-capped",
               "lockdown-gate", "record-ui", "proxy-listener", "proxy-upstream"):
         assert n in names, n
@@ -146,3 +149,16 @@ def test_swarm_image_pins_a_hypgraph_whose_serve_answers_browsers():
     pin = re.search(r"^ARG HYPGRAPH_VERSION=(\S+)$", df, re.M).group(1)
     assert tuple(int(x) for x in pin.split(".")[:3]) >= (0, 7, 7), pin
     assert "--host 0.0.0.0" in (env.IMAGES_DIR / "swarm" / "entrypoint.sh").read_text(encoding="utf-8")
+
+
+def test_ipc_namespace_check_reads_both_containers(monkeypatch):
+    """The host-side probe: separate IPC namespaces pass, a shared one fails, an unreadable one is not a pass."""
+    from hypdmz import egress
+    ns = {}
+    monkeypatch.setattr(egress, "_ns", lambda c, kind: ns.get(c, ""))
+    ns.update({"hypdmz-swarm": "ipc:[4026532301]", "hypdmz-proxy": "ipc:[4026532302]"})
+    assert [(r.name, r.passed, r.observed) for r in egress.namespace_checks()] == [("ipc-namespace-shared", True, "separate")]
+    ns["hypdmz-proxy"] = "ipc:[4026532301]"
+    assert egress.namespace_checks()[0].passed is False and egress.namespace_checks()[0].observed == "shared"
+    ns["hypdmz-proxy"] = ""
+    assert egress.namespace_checks()[0].passed is False and egress.namespace_checks()[0].observed == "missing"

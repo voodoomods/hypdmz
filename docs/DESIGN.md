@@ -73,6 +73,15 @@ Three things a hostile or runaway swarm process could still have done, each now 
   (`HYPDMZ_SWARM_*`). Probes `swarm-rootfs-readonly`, `swarm-memory-capped`, `swarm-pids-capped`,
   `swarm-cpu-capped` read the cgroup and `/proc/mounts` from inside. `/records` and `/work` are host bind
   mounts and cannot be size-capped by podman; that stays a limit.
+- **Reach the other containers through shared kernel objects.** The pod shares only the network namespace (the
+  egress floor works on it) and the hostname: `podman pod create --share net,uts`. Podman's default also shares
+  IPC, which would put the swarm and the proxy in one SysV shared-memory and message-queue space; nothing used it,
+  and now it isn't there. Probe `ipc-namespace-shared` compares the two containers' `/proc/self/ns/ipc` from the
+  host. The pod never shared the PID namespace, so the swarm sees only its own processes.
+- **Find something under `/run/secrets`.** Podman can add default mounts there (on Fedora-based podman machines,
+  Red Hat subscription files: public CA certificates and a config file). The swarm is given no secrets, so it gets
+  an empty read-only tmpfs at `/run/secrets` instead; the proxy keeps its own, where the model key's podman secret
+  lands. Probe `run-secrets-empty` checks it from the swarm's seat.
 - **Call the model without limit.** `proxy/app/limits.py`: sliding-hour caps on forwarded calls and request
   megabytes, over every rule, from `firewall.json → limits` (hot-reloaded). Past a cap: 429, audited as
   `limit:<cap>`. In memory, so a proxy restart resets the window. HypSwarm's own budget is the finer control;

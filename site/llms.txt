@@ -18,9 +18,9 @@ The egress floor is keyed on socket owner UID, not on port. All three containers
 
 The controller applies the floor first. The swarm waits for LOCKED (60 s) and refuses to start otherwise. `hypdmz up` ends by running `egress-check` as the swarm user inside the swarm container and stops the swarm if any escape probe succeeds. A missing or malformed firewall.json denies everything. TLS interception unavailable → every CONNECT refused (no opaque tunnels).
 
-## Proof (hypdmz egress-check, 2026-10-29)
+## Proof (hypdmz egress-check, 2026-10-30)
 
-21 of 21. Blocked, from the swarm's seat: direct HTTPS by name, by IP, plain HTTP by IP, IPv6, DNS to a public resolver, DNS via the pod's resolver, the proxy's control API, an unlisted host through the proxy, a relay to the control API through the proxy, reading the CA private key, writing its own code. Present: a read-only root filesystem, memory, process-count and CPU limits on the cgroup. Reachable (controls): the lockdown gate, the record UI, the proxy, the model host through the proxy. From the host: the control API answers 401 without its bearer token and 200 with it.
+23 of 23. Blocked, from the swarm's seat: direct HTTPS by name, by IP, plain HTTP by IP, IPv6, DNS to a public resolver, DNS via the pod's resolver, the proxy's control API, an unlisted host through the proxy, a relay to the control API through the proxy, reading the CA private key, finding anything under /run/secrets, writing its own code. Present: a read-only root filesystem, memory, process-count and CPU limits on the cgroup. Reachable (controls): the lockdown gate, the record UI, the proxy, the model host through the proxy. From the host: the control API answers 401 without its bearer token and 200 with it, and the swarm and the proxy are in separate IPC namespaces.
 
 Hourly caps (firewall.json → limits: calls_per_hour, megabytes_per_hour) tested live with the cap set to one call: 429 with X-Proxy-Rule: limit:calls_per_hour, audited, then restored.
 

@@ -213,6 +213,7 @@ body.apppage { height: 100vh; height: 100dvh; display: flex; flex-direction: col
 .toc { position: sticky; top: 76px; align-self: start; font-size: 14px; }
 .toc a { display: block; color: var(--ink2); text-decoration: none; padding: 4px 0 4px 10px; border-left: 2px solid var(--line); }
 .toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+.prose { overflow-wrap: anywhere; }   /* a long URL would push a 320 px phone sideways */
 .prose h2 { font-size: 24px; letter-spacing: -.02em; margin: 44px 0 10px; scroll-margin-top: 80px; }
 .prose h2:first-child { margin-top: 0; }
 .prose h3 { font-size: 18px; margin: 26px 0 8px; scroll-margin-top: 80px; }

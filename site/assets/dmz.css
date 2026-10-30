@@ -74,7 +74,7 @@
 
 /* ── policy ── */
 .pol { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 20px; align-items: start; }
-@media (max-width: 860px) { .pol { grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .pol { grid-template-columns: minmax(0, 1fr); } }   /* 1fr would not shrink below the policy code block: the page scrolled sideways on phones */
 .pol .code pre { font-size: 12.5px; }
 .pol .code .c { color: var(--ink3); } .pol .code .k { color: var(--accent); } .pol .code .s { color: var(--ok); }
 .pol ul { margin: 0; padding-left: 18px; color: var(--ink2); font-size: 14.5px; } .pol li { margin: 6px 0; } .pol li b { color: var(--ink); }

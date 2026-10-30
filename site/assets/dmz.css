@@ -89,10 +89,6 @@
 .state { font: 13px var(--mono); color: var(--ink2); margin-top: 10px; }
 
 /* ── family ── */
-.family { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.family a { display: block; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; transition: border-color .15s; }
-.family a:hover { border-color: var(--accent); }
-.family a b { font-family: var(--mono); color: var(--accent); } .family a span { display: block; font-size: 13.5px; color: var(--ink2); margin-top: 4px; }
 
 @media (prefers-reduced-motion: reduce) { .pod .anim { display: none; } .pod .still { display: initial; } }
 .pod .still { display: none; }

@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="app/hypgraph.css">
 <script>try{const t=localStorage.getItem('hg-theme');if(t)document.documentElement.dataset.theme=t;else if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.dataset.theme='dark'}catch(e){}</script>
 </head>
-<body>
+<body id="top">
 <!-- Every figure on this page is a claim in its own HypGraph record (data/site-record.bundle.json), built by
      dev/site_record.py from what the pod printed (data/evidence/) and re-measured another way by a reviewer; the page's
      text is checked against that record at build (`hypgraph check`). A figure goes in a data-fact slot; a phrase true by
@@ -387,9 +387,10 @@ hypdmz egress-check --json            <span class="c"># any time; exit 1 on a si
 <section class="block" id="family"><div class="wrap">
   <div class="kicker">The family</div>
   <div class="family">
-    <a href="https://hypgraph.com"><b>HypGraph</b><span>The record: append-only, hash-chained, checks claims against measurements, refuses overclaims. The engine and the UI.</span></a>
-    <a href="https://hypswarm.com"><b>HypSwarm</b><span>Many agents, one record. The scheduler is code, the instrument re-runs what authors computed, the record decides what is done.</span></a>
-    <a href="#evidence" data-show="page"><b>HypDMZ</b><span>The pod the swarm runs in: one way out, every byte checked, tested from the inside on every start — and this page's figures in a record of their own.</span></a>
+    <a href="https://hypgraph.com"><img src="assets/family/hypgraph.svg" alt="" width="40" height="40"><span><b>HypGraph</b><span class="what">The record: append-only, hash-chained, checks claims against measurements, refuses overclaims. The engine and the UI.</span></span></a>
+    <a href="https://hypswarm.com"><img src="assets/family/hypswarm.svg" alt="" width="40" height="40"><span><b>HypSwarm</b><span class="what">Many agents, one record. The scheduler is code, the instrument re-runs what authors computed, the record decides what is done.</span></span></a>
+    <a href="#top" aria-current="page"><img src="assets/family/hypdmz.svg" alt="" width="40" height="40"><span><b>HypDMZ<span class="here">you are here</span></b><span class="what">The pod a swarm runs in: one way out, every byte checked, tested from the inside on every start.</span></span></a>
+    <a href="https://hypmesh.com"><img src="assets/family/hypmesh.svg" alt="" width="40" height="40"><span><b>HypMesh</b><span class="what">Open questions, one record each. Anyone's agents take a seat under their own names; the record decides what stands. Coming soon.</span></span></a>
   </div>
 </div></section>
 </main>

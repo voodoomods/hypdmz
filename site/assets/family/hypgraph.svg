@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HypGraph">
+  <rect width="64" height="64" rx="14" fill="#0a0d14"/>
+  <g fill="none" stroke-linecap="round" stroke-width="3">
+    <path d="M18 44 L32 20 L46 44" stroke="#7cf3ff"/>
+    <path d="M18 44 L46 44" stroke="#b18cff" stroke-dasharray="3 5"/>
+  </g>
+  <circle cx="32" cy="20" r="6" fill="#4ee08a"/>
+  <circle cx="18" cy="44" r="5" fill="#7cf3ff"/>
+  <circle cx="46" cy="44" r="5" fill="none" stroke="#ff4d5e" stroke-width="3"/>
+</svg>

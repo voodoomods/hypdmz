@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HypMesh">
+  <rect width="64" height="64" rx="14" fill="#0a0d14"/>
+  <!-- records joined into a mesh: three HypGraph triangles sharing edges; the shared bases are the pinned references -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 44 L23 20 L32 44 L41 20 L50 44" stroke="#7cf3ff" stroke-width="3"/>
+    <path d="M14 44 L50 44" stroke="#b18cff" stroke-width="2.5" stroke-dasharray="3 5"/>
+    <path d="M23 20 L41 20" stroke="#b18cff" stroke-width="2.5" stroke-dasharray="3 5"/>
+  </g>
+  <circle cx="23" cy="20" r="5.5" fill="#4ee08a"/>
+  <circle cx="41" cy="20" r="5.5" fill="#4ee08a"/>
+  <circle cx="14" cy="44" r="4.5" fill="#7cf3ff"/>
+  <circle cx="32" cy="44" r="4.5" fill="#7cf3ff"/>
+  <circle cx="50" cy="44" r="4.5" fill="none" stroke="#ff4d5e" stroke-width="3"/>
+</svg>

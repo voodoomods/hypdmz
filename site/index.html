@@ -220,12 +220,13 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <p class="sub">This is the output of <code>hypdmz egress-check</code>, run as the swarm user inside the swarm container, the
     way <code>hypdmz up</code> runs it at the end of every start. A probe marked <em>blocked</em> must fail; one marked
     <em>reachable</em> must succeed, so the check cannot pass because networking is simply dead.</p>
-  <div class="term"><div class="bar"><i></i><i></i><i></i><span>hypdmz egress-check · 2026-10-29</span></div>
+  <!-- egress-check:begin (dev/site_record.py writes this) -->
+  <div class="term"><div class="bar"><i></i><i></i><i></i><span>hypdmz egress-check · 2026-10-30</span></div>
 <pre><span class="hdr">── lockdown ──</span>
-  <span class="lock">LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-29T15:42:15Z denied_v4=0 denied_v6=0</span>
-  caps: 1200 calls/h · 300.0 MB/h · last hour: 1 calls, 0.0 MB
+  <span class="lock">LOCKED fingerprint=7016fe3f3b834eca applied_at=2026-10-30T16:48:17Z checked_at=2026-10-30T16:48:48Z denied_v4=15 denied_v6=9</span>
+  caps: 1200 calls/h · 300.0 MB/h · last hour: 2 calls, 0.0 MB
 
-<span class="hdr">── probes (run as the swarm user; the two console probes from the host) ──</span>
+<span class="hdr">── probes (run as the swarm user; the console, IPC namespace and proxy-process probes from the host) ──</span>
   <span class="pass">[PASS]</span> direct-https-by-name     expect blocked   got 000    HTTPS to a public hostname, ignoring HTTPS_PROXY
   <span class="pass">[PASS]</span> direct-https-by-ip       expect blocked   got 000    HTTPS straight to an IP (no DNS needed)
   <span class="pass">[PASS]</span> direct-http-by-ip        expect blocked   got 000    Plain HTTP straight to an IP
@@ -236,6 +237,7 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <span class="pass">[PASS]</span> proxy-denies-unlisted    expect blocked   got 000    A host not in firewall.json, through the proxy
   <span class="pass">[PASS]</span> proxy-relay-to-console   expect blocked   got 403    Reach the control API by relaying through the proxy
   <span class="pass">[PASS]</span> ca-private-key           expect blocked   got fail   Read the egress CA's private key (only the proxy holds it)
+  <span class="pass">[PASS]</span> run-secrets-empty        expect blocked   got fail   Find anything under /run/secrets (podman's default mounts land there; the swarm is given none)
   <span class="pass">[PASS]</span> swarm-code-write         expect blocked   got fail   Write its own code (hypswarm, the entrypoint)
   <span class="pass">[PASS]</span> swarm-rootfs-readonly    expect reachable got ok     The container's root filesystem is mounted read-only
   <span class="pass">[PASS]</span> swarm-memory-capped      expect reachable got ok     A memory limit is set on the container's cgroup
@@ -244,11 +246,17 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
   <span class="pass">[PASS]</span> lockdown-gate            expect reachable got ok     The controller reports LOCKED on the gate
   <span class="pass">[PASS]</span> record-ui                expect reachable got 200    The record UI answers on :8000
   <span class="pass">[PASS]</span> proxy-listener           expect reachable got 403    The proxy answers on :8080
-  <span class="pass">[PASS]</span> proxy-upstream           expect reachable got 200    The model host through the proxy (api.deepinfra.com)
+  <span class="pass">[PASS]</span> proxy-upstream           expect reachable got 200    The model host through the proxy (api.deepinfra.com; the proxy UID has egress)
   <span class="pass">[PASS]</span> console-requires-token   expect blocked   got 401    Control API without the bearer token (from the host)
   <span class="pass">[PASS]</span> console-with-token       expect reachable got 200    Control API with the token from console.token
+  <span class="pass">[PASS]</span> ipc-namespace-shared     expect blocked   got separate  The swarm and the proxy in one IPC namespace (from the host)
+  <span class="pass">[PASS]</span> proxy-not-root           expect reachable got 1001   The proxy's main process runs as UID 1001, not root (from the host)
+  <span class="pass">[PASS]</span> proxy-no-capabilities    expect reachable got 0000000000000000  The proxy's process holds no capabilities (CapEff is zero)
+  <span class="pass">[PASS]</span> proxy-no-new-privileges  expect reachable got 1      The proxy's process cannot gain privileges (NoNewPrivs)
+  <span class="pass">[PASS]</span> proxy-rootfs-readonly    expect reachable got ro     The proxy container's root filesystem is mounted read-only
 
 <span class="pass">[hypdmz] egress floor verified: every bypass this check tries was blocked.</span></pre></div>
+  <!-- egress-check:end -->
 
   <h2 class="h" style="margin-top:56px">The first swarm, measured.</h2>
   <p class="sub"><code>hypdmz run first-swarm --python</code>: two seats, a t-test on a CSV, every computation run by

@@ -47,7 +47,22 @@ EV = SITE / "data" / "evidence"
 
 # which probes are refusals that answer with an HTTP error (a 2xx/3xx would be the breach), as egress.py defines them
 HTTP_ERROR_IS_BLOCKED = {"proxy-denies-unlisted", "proxy-relay-to-console"}
-LIMIT_PROBES = {"swarm-rootfs-readonly", "swarm-memory-capped", "swarm-pids-capped", "swarm-cpu-capped"}
+# limits on the containers: the swarm's from inside it, the proxy's process and filesystem from the host
+LIMIT_PROBES = {"swarm-rootfs-readonly", "swarm-memory-capped", "swarm-pids-capped", "swarm-cpu-capped",
+                "proxy-not-root", "proxy-no-capabilities", "proxy-no-new-privileges", "proxy-rootfs-readonly"}
+# the probes egress.py runs from the host; the rest run as the swarm user inside the swarm container
+HOST_PROBES = {"console-requires-token", "console-with-token", "ipc-namespace-shared", "proxy-not-root",
+               "proxy-no-capabilities", "proxy-no-new-privileges", "proxy-rootfs-readonly"}
+# a probe that reads a setting passes on the value the setting must have — written here independently of egress.py
+SETTINGS = {
+    "swarm-rootfs-readonly": lambda o: o == "ok", "swarm-memory-capped": lambda o: o == "ok",
+    "swarm-pids-capped": lambda o: o == "ok", "swarm-cpu-capped": lambda o: o == "ok", "lockdown-gate": lambda o: o == "ok",
+    "ipc-namespace-shared": lambda o: o == "separate",
+    "proxy-not-root": lambda o: o.isdigit() and int(o) == 1001,
+    "proxy-no-capabilities": lambda o: bool(re.fullmatch(r"[0-9a-fA-F]{1,32}", o)) and int(o, 16) == 0,
+    "proxy-no-new-privileges": lambda o: o == "1",
+    "proxy-rootfs-readonly": lambda o: o == "ro",
+}
 
 
 def now() -> str:
@@ -73,8 +88,42 @@ def probes() -> dict:
         else:
             cat["controls"].append(r)
     kn = lambda rows: {"k": sum(1 for r in rows if r["passed"]), "n": len(rows)}
+    when = re.search(r"checked_at=(\d{4}-\d\d-\d\d)", d["lockdown_state"]) or re.search(r"(\d{4}-\d\d-\d\d)", d["lockdown_state"])
     return {"all": kn(rs), **{k: kn(v) for k, v in cat.items()}, "lockdown": d["lockdown_state"], "ok": d["ok"],
-            "caps": d.get("caps") or {}, "results": rs}
+            "caps": d.get("caps") or {}, "results": rs, "host": sum(1 for r in rs if r["name"] in HOST_PROBES),
+            "date": when.group(1) if when else "", "error": d.get("error")}
+
+
+def transcript(P: dict) -> str:
+    """The egress-check transcript on the page, printed from egress-check.json the way `hypdmz egress-check` prints it
+    (egress.print_report), so the page shows every probe the evidence holds."""
+    e = lambda x: html.escape(x, quote=False)
+    out = ["<span class=\"hdr\">── lockdown ──</span>", f"  <span class=\"lock\">{e(P['lockdown'])}</span>"]
+    c = P["caps"]
+    if c:
+        used = c.get("last_hour") or {}
+        out.append(f"  caps: {c.get('calls_per_hour') or '∞'} calls/h · {c.get('megabytes_per_hour') or '∞'} MB/h · "
+                   f"last hour: {used.get('calls', 0)} calls, {used.get('megabytes', 0)} MB")
+    out += ["", "<span class=\"hdr\">── probes (run as the swarm user; the console, IPC namespace and proxy-process probes "
+                "from the host) ──</span>"]
+    for r in P["results"]:
+        glyph = '<span class="pass">[PASS]</span>' if r["passed"] else '<span class="bad">[FAIL]</span>'
+        expect = "blocked" if r["kind"] == "blocked" else "reachable"
+        out.append(f"  {glyph} {e(r['name']):24s} expect {expect:9s} got {e(str(r['observed'])):5s}  {e(r['description'])}")
+    out.append("")
+    out.append('<span class="pass">[hypdmz] egress floor verified: every bypass this check tries was blocked.</span>' if P["ok"]
+               else '<span class="bad">[hypdmz] the check did not pass — see egress-check.json.</span>')
+    return (f'<div class="term"><div class="bar"><i></i><i></i><i></i><span>hypdmz egress-check · {e(P["date"])}</span></div>\n'
+            "<pre>" + "\n".join(out) + "</pre></div>")
+
+
+def write_transcript(P: dict) -> None:
+    """Replace the transcript between its markers in index.html."""
+    page = PAGE.read_text(encoding="utf-8")
+    a, b = "<!-- egress-check:begin (dev/site_record.py writes this) -->", "<!-- egress-check:end -->"
+    head, rest = page.split(a, 1)
+    _, tail = rest.split(b, 1)
+    PAGE.write_text(head + a + "\n  " + transcript(P) + "\n  " + b + tail, encoding="utf-8", newline="\n")
 
 
 def audit_lines() -> list[dict]:
@@ -132,17 +181,23 @@ def edges() -> dict:
 
 # ── the reviewer's re-measurements (another way) ───────────────────────────────────────────────────────────────
 def rejudge_probes(results: list[dict]) -> int:
-    """Count passes from the raw observations with the probe rules, instead of trusting the `passed` flags."""
+    """Count passes from the raw observations with the probe rules, instead of trusting the `passed` flags. A probe
+    the rules don't know, or an observation of a shape they don't expect, doesn't pass: a new probe gets an
+    objection until the reviewer learns what it must observe (proxy-rootfs-readonly's "ro" did, 2026-10-30)."""
     def ok(r):
-        o = r["observed"]
-        got_through = o == "ok" or (o.isdigit() and o != "000")
-        if r["kind"] == "control":
-            return got_through if r["name"] != "console-with-token" else o == "200"
-        if r["name"] == "console-requires-token":
+        o, name = str(r["observed"]), r["name"]
+        status = len(o) == 3 and o.isdigit()                 # an HTTP status; 000 is curl's "no connection"
+        if name in SETTINGS:
+            return SETTINGS[name](o)
+        if name == "console-with-token":
+            return o == "200"
+        if name == "console-requires-token":
             return o == "401"
-        if r["name"] in HTTP_ERROR_IS_BLOCKED:
-            return not (o.isdigit() and 200 <= int(o) < 400)
-        return not got_through
+        if name in HTTP_ERROR_IS_BLOCKED:
+            return status and not 200 <= int(o) < 400
+        if r["kind"] == "control":
+            return status and o != "000"                     # an answer
+        return o in ("000", "fail")                          # blocked: no connection, or the attempt failed
     return sum(1 for r in results if ok(r))
 
 
@@ -230,7 +285,8 @@ def build(live: bool) -> tuple[Graph, str, dict]:
 
     P = probes()
     measure("probes", "Does the egress floor hold, from the swarm's own seat?", "hypdmz egress-check --json",
-            "hypdmz egress-check --json  (19 probes as the swarm user inside the swarm container, 2 from the host)",
+            f"hypdmz egress-check --json  ({P['all']['n'] - P['host']} probes as the swarm user inside the swarm container, "
+            f"{P['host']} from the host)",
             f"{P['all']['k']} of {P['all']['n']} probes passed: {P['blocked']['k']} of {P['blocked']['n']} escape routes blocked, "
             f"{P['limits']['k']} of {P['limits']['n']} limits present, {P['controls']['k']} of {P['controls']['n']} controls reachable, "
             f"{P['console']['k']} of {P['console']['n']} console checks right. Lockdown: {P['lockdown'].split(' ')[0]}.",
@@ -239,7 +295,8 @@ def build(live: bool) -> tuple[Graph, str, dict]:
     claim("probes", f"{P['all']['k']} of {P['all']['n']} egress-check probes passed: {P['blocked']['k']} of {P['blocked']['n']} "
           f"escape routes blocked, {P['limits']['k']} of {P['limits']['n']} limits present, {P['controls']['k']} of "
           f"{P['controls']['n']} controls reachable, and the console answered as it should in {P['console']['k']} of {P['console']['n']} checks.",
-          "One pod on one Windows 11 host (Podman Desktop, WSL2), 2026-10-29; probes run as the swarm user inside the swarm container, the console checks from the host.",
+          f"One pod on one Windows 11 host (Podman Desktop, WSL2), {P['date']}; probes run as the swarm user inside the swarm "
+          "container, the console, IPC namespace and proxy-process checks from the host.",
           [{"name": "probes passed", "key": "probes", **P["all"]}, {"name": "escape routes blocked", "key": "blocked", **P["blocked"]},
            {"name": "limits present", "key": "limits", **P["limits"]}, {"name": "controls reachable", "key": "controls", **P["controls"]},
            {"name": "console checks", "key": "console", **P["console"]}])
@@ -312,7 +369,8 @@ def build(live: bool) -> tuple[Graph, str, dict]:
                      notes=f"The second run passed {lk} of {len(live['results'])} probes, and re-judging the saved observations gives {rj} of {P['all']['n']}.")
     else:
         check.review(nodes["probes"]["claim"], "checked" if rj == P["all"]["k"] else "objection",
-                     method="Re-judged the saved observations with the probe rules (blocked: no connection or an HTTP error; control: an answer) instead of trusting the flags.",
+                     method="Re-judged the saved observations with the probe rules (blocked: no connection, or an HTTP error where the "
+                            "refusal is one; control: an answer; a setting: the value it must have) instead of trusting the flags.",
                      notes=f"Re-judged from the observations, {rj} of {P['all']['n']} probes pass.")
     R = regex_counts()
     check.review(nodes["key"]["claim"], "checked" if (R["calls"], R["injected"]) == (K["calls"]["n"], K["calls"]["k"]) else "objection",
@@ -384,6 +442,7 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     t0 = time.time()
+    write_transcript(probes())
     g, inv, built = build(a.live)
     values = fill(built["facts"])
     text, ok = page_text(values)

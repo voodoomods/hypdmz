@@ -155,6 +155,16 @@ def test_swarm_image_pins_a_hypgraph_whose_serve_answers_browsers():
     assert "--host 0.0.0.0" in (env.IMAGES_DIR / "swarm" / "entrypoint.sh").read_text(encoding="utf-8")
 
 
+def test_the_site_and_the_pod_run_the_same_hypgraph():
+    """The page's record and UI are built with the hypgraph the swarm image installs, so what the site shows is what
+    the pod serves."""
+    df = (env.IMAGES_DIR / "swarm" / "Dockerfile").read_text(encoding="utf-8")
+    pod = re.search(r"^ARG HYPGRAPH_VERSION=(\S+)$", df, re.M).group(1)
+    pages = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+    site = re.search(r'pip install "hypgraph==([^"]+)"', pages).group(1)
+    assert site == pod, (site, pod)
+
+
 def test_ipc_namespace_check_reads_both_containers(monkeypatch):
     """The host-side probe: separate IPC namespaces pass, a shared one fails, an unreadable one is not a pass."""
     from hypdmz import egress

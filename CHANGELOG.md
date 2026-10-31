@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **hypgraph 0.7.12** in the swarm image (was 0.7.7) and in the site build (was 0.7.10), and a test keeps the two
+  equal. 0.7.8–0.7.12 bring pinned references between records, blind work orders and their seal, and the
+  pre-launch trust-boundary fixes (same-origin writes, reviewer names need a named token, `verify --head`).
+  Checked on this machine: the pod comes up on the new image with all 27 `egress-check` probes passing, the
+  existing record (323 events) verifies with the same head, scripted swarms settle inside the image with no
+  network, and the site record builds with 0 copy errors.
 - **The proxy is hardened like the swarm.** `--cap-drop ALL` plus only SETUID, SETGID, SETPCAP and CHOWN (the entrypoint
   drops to the proxy UID and empties the bounding set), `no-new-privileges`, a read-only root with `/tmp` as the only
   scratch space. Four `egress-check` probes read the proxy's process from the host: UID 1001, no capabilities,

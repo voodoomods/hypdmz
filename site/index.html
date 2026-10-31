@@ -187,7 +187,7 @@ Authorization: Bearer <span class="key">dk_••••••••••••�
     <li><i>6</i><div><b>It runs in a box with edges.</b><span>Read-only root filesystem; <code>/tmp</code> and its home are
       size-capped tmpfs; memory, CPU and process count are capped on the cgroup. Only <code>/records</code> and <code>/work</code>
       persist. A runaway script runs out of room, not the machine.</span></div></li>
-    <li class="stop"><i>✕</i><div><b><code>hypdmz up</code> ends by trying to escape.</b><span><span data-fact="probes-n"></span> probes, most as the swarm user inside the swarm container and the console pair from the host. One success stops the swarm container;
+    <li class="stop"><i>✕</i><div><b><code>hypdmz up</code> ends by trying to escape.</b><span><span data-fact="probes-n"></span> probes, most as the swarm user inside the swarm container and the console pair, the IPC namespace check and the proxy-process checks from the host. One success stops the swarm container;
       the command exits non-zero. A probe with no
       report counts as a failure.</span></div></li>
   </ol>

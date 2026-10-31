@@ -6,7 +6,7 @@ files, and the page's text is checked against the record (`hypgraph check`). Not
 
 | file | what it is | how it was captured |
 |---|---|---|
-| `egress-check.json` | the 21 probes, lockdown state and the proxy's caps | `hypdmz egress-check --json` (19 probes run as the swarm user inside the swarm container, 2 from the host) |
+| `egress-check.json` | the 27 probes, lockdown state and the proxy's caps | `hypdmz egress-check --json` (20 probes run as the swarm user inside the swarm container, 7 from the host) |
 | `status.json` | the proxy's status: TLS interception, policy, caps, vault count | `GET :8002/api/status` with the console token |
 | `audit-verify.json` | the proxy's own walk of its audit chain | `GET :8002/api/audit/verify` |
 | `proxy_events.jsonl` | the audit chain itself: one line per request, hash-chained | copied from `<state dir>/proxy-data/audit/` |

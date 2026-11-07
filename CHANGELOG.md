@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The egress floor opens the model host's own port.** The controller allowed the proxy UID out on 443, 80, the
+  mail and infra ports and the FTP range only, so a model served elsewhere — a LAN llama-server on `:8080` — was
+  "connection refused" for the proxy itself while every other probe passed. The launcher now reads the port from
+  `MODEL_BASE_URL` (`Config.model_port`: the URL's port, else 443 for https and 80 for http) and passes it as
+  `HYPDMZ_MODEL_PORT`; the floor adds one rule for exactly that port. Found bringing a bench pod up on a BC-250
+  (2026-11-07).
+- **hypswarm 0.1.0a15 and hypgraph 0.8.6 in the swarm image** (were 0.1.0a11 and 0.7.12).
+
 - **hypgraph 0.7.12** in the swarm image (was 0.7.7) and in the site build (was 0.7.10), and a test keeps the two
   equal. 0.7.8–0.7.12 bring pinned references between records, blind work orders and their seal, and the
   pre-launch trust-boundary fixes (same-origin writes, reviewer names need a named token, `verify --head`).

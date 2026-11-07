@@ -4,8 +4,8 @@
 # Pinned by digest (the multi-arch index of python:3.12-slim); see the proxy Dockerfile for how to update.
 FROM python:3.12-slim@sha256:46cb7cc2877e60fbd5e21a9ae6115c30ace7a077b9f8772da879e4590c18c2e3
 
-ARG HYPSWARM_VERSION=0.1.0a11
-ARG HYPGRAPH_VERSION=0.7.12
+ARG HYPSWARM_VERSION=0.1.0a15
+ARG HYPGRAPH_VERSION=0.8.6
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu curl ca-certificates git \

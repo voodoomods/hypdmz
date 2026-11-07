@@ -61,6 +61,20 @@ def test_env_and_ports(state):
     assert cfg.swarm_memory == "2g" and cfg.swarm_cpus == "2" and cfg.swarm_pids == "512"
     assert cfg.key_secret == "hypdmz_llm_api_key"
     assert cfg.policy_path == state / "policy" / "firewall.json"
+    assert cfg.model_port == 443
+
+
+def test_the_floor_opens_the_model_hosts_own_port(state, monkeypatch):
+    # a LAN llama-server on :8080 was "connection refused" for the proxy: the floor knew only the web, mail and
+    # infra ports (2026-11-07)
+    monkeypatch.setenv("MODEL_BASE_URL", "http://10.0.0.139:8080/v1")
+    assert env.load().model_port == 8080 and env.load().model_host == "10.0.0.139"
+    monkeypatch.setenv("MODEL_BASE_URL", "http://models.internal/v1")
+    assert env.load().model_port == 80
+    monkeypatch.setenv("MODEL_BASE_URL", "https://api.deepinfra.com/v1/openai")
+    assert env.load().model_port == 443
+    script = (env.Config().images_dir / "controller" / "apply-lockdown.sh").read_text(encoding="utf-8")
+    assert 'MODEL_PORT="${HYPDMZ_MODEL_PORT:-443}"' in script and '--dport "$MODEL_PORT" -j ACCEPT' in script
 
 
 def test_process_env_overrides_file(state, monkeypatch):

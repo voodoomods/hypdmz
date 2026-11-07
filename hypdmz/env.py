@@ -166,6 +166,14 @@ class Config:
         return urlparse(self.model_base_url).hostname or ""
 
     @property
+    def model_port(self) -> int:
+        """The model host's TCP port: the URL's, else 443 for https and 80 for http. The egress floor opens exactly
+        this port for the proxy UID — a LAN llama-server on :8080 was unreachable because the floor knew only the
+        web, mail and infra ports (2026-11-07)."""
+        u = urlparse(self.model_base_url)
+        return int(u.port) if u.port else (80 if u.scheme == "http" else 443)
+
+    @property
     def model(self) -> str:
         return self.env.get("MODEL") or DEFAULT_MODEL
 

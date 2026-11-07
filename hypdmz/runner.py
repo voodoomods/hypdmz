@@ -103,7 +103,8 @@ def cmd_up(cfg: Config, platform: Platform, *, dry_run: bool = False, skip_egres
 
     _do(["podman", "run", "-d", "--pod", POD_NAME, "--name", CONTROLLER,
          "--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW",
-         *_envs({"HYPDMZ_PROXY_UID": str(PROXY_UID), "HYPDMZ_CONTROL_PORT": "8002"}),
+         *_envs({"HYPDMZ_PROXY_UID": str(PROXY_UID), "HYPDMZ_CONTROL_PORT": "8002",
+                 "HYPDMZ_MODEL_PORT": str(cfg.model_port)}),
          "hypdmz-controller:latest"], dry_run)
 
     proxy_env = {

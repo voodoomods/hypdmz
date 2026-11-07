@@ -36,6 +36,9 @@ CONTROL_PORT="${HYPDMZ_CONTROL_PORT:-8002}"
 PROXY_TCP_PORTS_WEB_MAIL="443,80,587,465,25,993,143,995,110"
 PROXY_TCP_PORTS_INFRA="22,21,20,5432,3306,6379,389,636"
 PROXY_TCP_RANGES="10000:10100"
+# The model host's own port, from MODEL_BASE_URL (the launcher passes it): a model served on a port outside the
+# lists above — a LAN llama-server on :8080 — is otherwise unreachable for the proxy too.
+MODEL_PORT="${HYPDMZ_MODEL_PORT:-443}"
 
 apply_family() {
     local ipt="$1"
@@ -67,6 +70,8 @@ apply_family() {
         -m multiport --dports "$PROXY_TCP_PORTS_INFRA" -j ACCEPT
     "$ipt" -A OUTPUT -m owner --uid-owner "$PROXY_UID" -p tcp \
         --dport "$PROXY_TCP_RANGES" -j ACCEPT
+    "$ipt" -A OUTPUT -m owner --uid-owner "$PROXY_UID" -p tcp \
+        --dport "$MODEL_PORT" -j ACCEPT
 
     # Everything else: fail fast. Packet counters on these two rules are the
     # "blocked egress attempts" figure surfaced by `hypdmz status`.

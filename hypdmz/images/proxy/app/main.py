@@ -186,9 +186,9 @@ def _parse_request(raw: bytes) -> tuple[str, str, dict, bytes]:
     return method, target, headers, body_bytes
 
 
-async def _read_full_request(reader: asyncio.StreamReader, timeout: float = 30.0) -> bytes:
-    """Read one HTTP/1.1 request (headers + Content-Length body if present)."""
-    head = b""
+async def _read_full_request(reader: asyncio.StreamReader, timeout: float = 30.0, first: bytes = b"") -> bytes:
+    """Read one HTTP/1.1 request (headers + Content-Length body if present). `first`: bytes already read from it."""
+    head = first
     while b"\r\n\r\n" not in head:
         try:
             chunk = await asyncio.wait_for(reader.read(65536), timeout=timeout)
@@ -456,6 +456,10 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                 if not keep_alive:
                     return
         else:
+            # One read is not one request: a client may send the headers and the body apart, and a body can be longer
+            # than a read. Forwarded as first read, such a request reached a plain-HTTP model with no body, and the
+            # model answered 400 (a llama-server on the LAN, 2026-11-12: 5 of the first 10 calls of a run)
+            raw = await _read_full_request(reader, timeout=60.0, first=raw)
             parsed = urlparse(target)
             host = parsed.hostname or ''
             port = parsed.port or 80

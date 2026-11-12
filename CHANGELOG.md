@@ -1,7 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.1.0a4 — 2026-11-12
 
+- **The proxy reads a plain-HTTP request whole before it forwards one.** It forwarded a plain-HTTP request as its first
+  socket read had it, so a client that sends the headers and the body apart (Python's `http.client` does, for a POST)
+  reached the upstream with no body: a llama-server on the LAN answered 400 to 5 of the first 10 calls of a swarm run.
+  The HTTPS path already read by `Content-Length`; the plain path now uses the same reader. A chunked body without a
+  `Content-Length` is still not read whole, on either path. Found running a swarm against a plain-HTTP model
+  (2026-11-12); with the fix a pod carried 4,722 model calls to two such models, all answered 200.
 - **The egress floor opens the model host's own port.** The controller allowed the proxy UID out on 443, 80, the
   mail and infra ports and the FTP range only, so a model served elsewhere — a LAN llama-server on `:8080` — was
   "connection refused" for the proxy itself while every other probe passed. The launcher now reads the port from
@@ -9,7 +15,6 @@
   `HYPDMZ_MODEL_PORT`; the floor adds one rule for exactly that port. Found bringing a bench pod up on a BC-250
   (2026-11-07).
 - **hypswarm 0.1.0a15 and hypgraph 0.8.6 in the swarm image** (were 0.1.0a11 and 0.7.12).
-
 - **hypgraph 0.7.12** in the swarm image (was 0.7.7) and in the site build (was 0.7.10), and a test keeps the two
   equal. 0.7.8–0.7.12 bring pinned references between records, blind work orders and their seal, and the
   pre-launch trust-boundary fixes (same-origin writes, reviewer names need a named token, `verify --head`).
